@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"math/rand"
+	"time"
 	"strings"
 
 	fmt "github.com/jhunt/go-ansi"
@@ -280,6 +282,7 @@ func main() {
 
 		id := opt.Create.ID
 		if id == "" {
+			rand.Seed(time.Now().UTC().UnixNano())
 			id = RandomName()
 		}
 

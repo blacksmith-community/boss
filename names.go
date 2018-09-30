@@ -345,5 +345,5 @@ var (
 )
 
 func RandomName() string {
-	return fmt.Sprintf("%s_%s", left[rand.Intn(len(left))], right[rand.Intn(len(right))])
+	return fmt.Sprintf("%s-%s", left[rand.Intn(len(left))], right[rand.Intn(len(right))])
 }
