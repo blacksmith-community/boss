@@ -1,0 +1,39 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "1yd1889u0iCn8v0rub4ym2LbUeE=",
+			"path": "github.com/jhunt/go-ansi",
+			"revision": "403d5f0d9ccb2ececa88041269b5063cdf60163f",
+			"revisionTime": "2018-06-30T01:38:15Z"
+		},
+		{
+			"checksumSHA1": "9Ac9rwC63VlGI9tHl8DqKOUcJDQ=",
+			"path": "github.com/jhunt/go-cli",
+			"revision": "44398e595118cf6d87a5a67175210964a02294fa",
+			"revisionTime": "2018-01-20T23:00:05Z"
+		},
+		{
+			"checksumSHA1": "8bXnF0vOnAodePX8tfy7vfBPM64=",
+			"path": "github.com/jhunt/go-envirotron",
+			"revision": "8bdb90f72b39102d14b82a2ead076865f8ba5886",
+			"revisionTime": "2017-10-17T04:30:50Z"
+		},
+		{
+			"checksumSHA1": "/L4hlvjltOZXrXJOrVRBdcWDAQc=",
+			"origin": "github.com/jhunt/go-cli/vendor/github.com/jhunt/go-snapshot",
+			"path": "github.com/jhunt/go-snapshot",
+			"revision": "44398e595118cf6d87a5a67175210964a02294fa",
+			"revisionTime": "2018-01-20T23:00:05Z"
+		},
+		{
+			"checksumSHA1": "y/A5iuvwjytQE2CqVuphQRXR2nI=",
+			"origin": "github.com/jhunt/go-ansi/vendor/github.com/mattn/go-isatty",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "403d5f0d9ccb2ececa88041269b5063cdf60163f",
+			"revisionTime": "2018-06-30T01:38:15Z"
+		}
+	],
+	"rootPath": "github.com/jhunt/boss"
+}
