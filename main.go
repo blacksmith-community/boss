@@ -12,6 +12,8 @@ import (
 	"github.com/jhunt/go-table"
 )
 
+var Version = "(dev)"
+
 func bail(e error) {
 	if e != nil {
 		fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", e)
@@ -23,6 +25,8 @@ var opt struct {
 	Debug bool `cli:"-D, --debug"`
 	Trace bool `cli:"-T, --trace"`
 	Help  bool `cli:"-h, --options"`
+
+	Version bool `cli:"-v, --version"`
 
 	URL      string `cli:"-U, --url" env:"BLACKSMITH_URL"`
 	Username string `cli:"-u, --username" env:"BLACKSMITH_USERNAME"`
@@ -122,6 +126,11 @@ func main() {
 
 	if opt.Trace {
 		opt.Debug = true
+	}
+
+	if opt.Version {
+		fmt.Printf("boss %s\n", Version)
+		os.Exit(0)
 	}
 
 	if command == "" && len(args) == 0 {
