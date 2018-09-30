@@ -1,10 +1,10 @@
 package main
 
 import (
-	"os"
 	"math/rand"
-	"time"
+	"os"
 	"strings"
+	"time"
 
 	fmt "github.com/jhunt/go-ansi"
 	"github.com/jhunt/go-cli"
@@ -37,13 +37,19 @@ var opt struct {
 	} `cli:"catalog, cat"`
 
 	Create struct {
-		ID string `cli:"-i, --id"`
+		ID     string `cli:"-i, --id"`
+		Follow bool   `cli:"-f, --follow"`
 	} `cli:"create, new"`
 
-	Delete   struct{} `cli:"delete, rm"`
-	Task     struct{} `cli:"task"`
+	Delete struct{} `cli:"delete, rm"`
+
+	Task struct {
+		Follow bool `cli:"-f, --follow"`
+	} `cli:"task"`
+
 	Manifest struct{} `cli:"manifest"`
-	Creds    struct{} `cli:"creds"`
+
+	Creds struct{} `cli:"creds"`
 }
 
 func usage(f string, args ...interface{}) {
@@ -296,7 +302,25 @@ func main() {
 		bail(err)
 		_, err = c.Create(id, service.ID, plan.ID)
 		bail(err)
+
 		fmt.Printf("@G{%s}/@Y{%s} instance @M{%s} created.\n", l[0], l[1], id)
+		if opt.Create.Follow {
+			fmt.Printf("\n@B{tailing deployment task log...}\n")
+			time.Sleep(time.Second)
+			task, _ := c.Task(id)
+			fmt.Printf("%s", task)
+
+			for {
+				time.Sleep(time.Second)
+
+				t, _ := c.Task(id)
+				if len(t) > len(task) {
+					fmt.Printf("%s", t[len(task):])
+					task = t
+				}
+			}
+			fmt.Printf("\n")
+		}
 		os.Exit(0)
 
 	case "delete":
@@ -332,10 +356,26 @@ func main() {
 		c := connect()
 		id, err := c.Resolve(args[0])
 		bail(err)
-		creds, err := c.Task(id)
+		task, err := c.Task(id)
 		bail(err)
 		fmt.Printf("# @M{%s}\n", id)
-		fmt.Printf("%s\n", creds)
+		fmt.Printf("%s", task)
+
+		if opt.Task.Follow {
+			for {
+				time.Sleep(time.Second)
+
+				t, err := c.Task(id)
+				bail(err)
+
+				if len(t) > len(task) {
+					fmt.Printf("%s", t[len(task):])
+					task = t
+				}
+			}
+		}
+
+		fmt.Printf("\n")
 		os.Exit(0)
 
 	case "manifest":
