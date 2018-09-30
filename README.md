@@ -5,6 +5,8 @@ BOSS - Blacksmith On-demand ServiceS
 [Blacksmith][bs], in case you don't have a Cloud Foundry or
 Kubernetes cluster handy.  It's great fun at demos.
 
+![boss is not in any way affiliate with THE BOSS, Bruce Springsteen](boss.jpg)
+
 You can use it to view the Blacksmith Catalog:
 
 ```
