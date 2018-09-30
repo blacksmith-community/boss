@@ -154,6 +154,11 @@ func main() {
 		instances, err := c.Instances()
 		bail(err)
 
+		if len(instances) == 0 {
+			fmt.Printf("@Y{No Blacksmith service instances found.}\n")
+			os.Exit(0)
+		}
+
 		if opt.List.Long {
 			t := table.NewTable("ID", "Service", "(ID)", "Plan", "(ID)")
 			for _, instance := range instances {
