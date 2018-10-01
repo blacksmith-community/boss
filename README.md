@@ -84,3 +84,6 @@ How Do I Contribute?
   4. Push to the branch (`git push origin my-new-feature`)
   5. Create a new Pull Request in Github
   6. Profit!
+
+
+[bs]: https://github.com/blacksmith-community/blacksmith
