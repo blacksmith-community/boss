@@ -32,6 +32,8 @@ var opt struct {
 	Username string `cli:"-u, --username" env:"BLACKSMITH_USERNAME"`
 	Password string `cli:"-p, --password" env:"BLACKSMITH_PASSWORD"`
 
+	Log struct {} `cli:"log, logs"`
+
 	List struct {
 		Long bool `cli:"-l, --long"`
 	} `cli:"list, ls"`
@@ -69,6 +71,8 @@ func commands() {
 	fmt.Printf("\n")
 	fmt.Printf("  @G{list}      Show all deployed service instances.\n")
 	fmt.Printf("  @G{catalog}   Print the catalog of services / plans.\n")
+	fmt.Printf("  @G{log}       Print the Blacksmith Service Broker log file.\n")
+	fmt.Printf("\n")
 	fmt.Printf("  @G{create}    Deploy a new instance of a service + plan.\n")
 	fmt.Printf("  @G{delete}    Delete a deployed service instance.\n")
 	fmt.Printf("\n")
@@ -152,6 +156,25 @@ func main() {
 	case "":
 		bad("", "@R{Unrecognized command `%s'...}", args[0])
 		os.Exit(1)
+
+	case "log":
+		if opt.Help {
+			usage("@C{log}")
+			options()
+			os.Exit(0)
+		}
+
+		if len(args) != 0 {
+			bad("log", "@R{The log command takes no arguments.}")
+			os.Exit(1)
+		}
+
+		c := connect()
+		log, err := c.Log();
+		bail(err)
+
+		fmt.Printf("%s\n", log);
+		os.Exit(0)
 
 	case "list":
 		if opt.Help {

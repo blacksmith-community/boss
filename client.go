@@ -197,6 +197,14 @@ func (c Client) Resolve(want string) (string, error) {
 	return "", fmt.Errorf("No instance found matching `%s'", want)
 }
 
+func (c Client) Log() (string, error) {
+	var out struct {
+		Log string `json:"log"`
+	}
+	_, err := c.request("GET", "/b/status", nil, &out)
+	return out.Log, err
+}
+
 func (c Client) Instances() ([]Instance, error) {
 	cat, err := c.Catalog()
 	if err != nil {
