@@ -24,7 +24,7 @@ func bail(e error) {
 var opt struct {
 	Debug bool `cli:"-D, --debug"`
 	Trace bool `cli:"-T, --trace"`
-	Help  bool `cli:"-h, --options"`
+	Help  bool `cli:"-h, --help"`
 
 	Version bool `cli:"-v, --version"`
 
@@ -83,8 +83,8 @@ func options() {
 	fmt.Printf("\n")
 	fmt.Printf("  (these can go anywhere on the command line, by the way...)\n")
 	fmt.Printf("\n")
-	fmt.Printf("  -h, --options      Show options and usage.  Can be set on a\n")
-	fmt.Printf("                  per-command basis for more options.\n")
+	fmt.Printf("  -h, --help      Show options and usage.  Can be set on a\n")
+	fmt.Printf("                  per-command basis for more help.\n")
 	fmt.Printf("\n")
 	fmt.Printf("  -D, --debug     Enable debugging output.\n")
 	fmt.Printf("  -T, --trace     Trace HTTP(s) calls.  Implies --debug.\n")
