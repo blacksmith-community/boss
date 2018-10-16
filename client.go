@@ -74,6 +74,7 @@ type Instance struct {
 func (c Client) do(method, path string, in interface{}) (*http.Response, error) {
 	if c.ua == nil {
 		c.ua = &http.Client{}
+		c.URL = strings.TrimSuffix(c.URL, "/")
 	}
 
 	var body io.Reader = nil
