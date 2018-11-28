@@ -138,6 +138,11 @@ func (c Client) request(method, path string, in, out interface{}) (int, error) {
 		}
 	}
 
+	if method == "DELETE" && res.StatusCode == 410 {
+		/* this is okay */
+		return res.StatusCode, nil
+	}
+
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return res.StatusCode, fmt.Errorf("API %s", res.Status)
 	}
