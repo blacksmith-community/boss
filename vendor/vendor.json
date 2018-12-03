@@ -3,10 +3,10 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "1yd1889u0iCn8v0rub4ym2LbUeE=",
+			"checksumSHA1": "wxi3v9rY+IhzvrOU4KUnFodd8IA=",
 			"path": "github.com/jhunt/go-ansi",
-			"revision": "403d5f0d9ccb2ececa88041269b5063cdf60163f",
-			"revisionTime": "2018-06-30T01:38:15Z"
+			"revision": "5fd839f108b6f065c3d1734d82b2f8be8e767b73",
+			"revisionTime": "2018-11-27T19:43:24Z"
 		},
 		{
 			"checksumSHA1": "9Ac9rwC63VlGI9tHl8DqKOUcJDQ=",
@@ -31,8 +31,8 @@
 			"checksumSHA1": "y/A5iuvwjytQE2CqVuphQRXR2nI=",
 			"origin": "github.com/jhunt/go-ansi/vendor/github.com/mattn/go-isatty",
 			"path": "github.com/mattn/go-isatty",
-			"revision": "403d5f0d9ccb2ececa88041269b5063cdf60163f",
-			"revisionTime": "2018-06-30T01:38:15Z"
+			"revision": "5fd839f108b6f065c3d1734d82b2f8be8e767b73",
+			"revisionTime": "2018-11-27T19:43:24Z"
 		}
 	],
 	"rootPath": "github.com/jhunt/boss"

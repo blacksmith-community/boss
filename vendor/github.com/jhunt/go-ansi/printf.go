@@ -45,11 +45,12 @@ var (
 )
 
 var (
-	force bool
+	force *bool
 )
 
 func ForceColor(c bool) {
-	force = c
+	tf := c
+	force = &tf
 }
 
 func strip(s string) string {
@@ -87,23 +88,26 @@ func CanColorize(out io.Writer) bool {
 }
 
 func ShouldColorize(out io.Writer) bool {
-	return force || CanColorize(out)
+	if force != nil {
+		return *force
+	}
+	return CanColorize(out)
 }
 
 func Printf(format string, a ...interface{}) (int, error) {
-	s := colorize(format)
+	s := Sprintf(format, a...)
 	if !ShouldColorize(os.Stdout) {
 		s = strip(s)
 	}
-	return fmt.Printf(s, a...)
+	return fmt.Printf("%s", s)
 }
 
 func Fprintf(out io.Writer, format string, a ...interface{}) (int, error) {
-	s := colorize(format)
+	s := Sprintf(format, a...)
 	if !ShouldColorize(out) {
 		s = strip(s)
 	}
-	return fmt.Fprintf(out, s, a...)
+	return fmt.Fprintf(out, "%s", s)
 }
 
 func Sprintf(format string, a ...interface{}) string {
