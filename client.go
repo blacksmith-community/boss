@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,11 +14,12 @@ import (
 )
 
 type Client struct {
-	URL      string
-	Username string
-	Password string
-	Debug    bool
-	Trace    bool
+	URL                string
+	Username           string
+	Password           string
+	InsecureSkipVerify bool
+	Debug              bool
+	Trace              bool
 
 	ua *http.Client
 }
@@ -73,7 +75,14 @@ type Instance struct {
 
 func (c Client) do(method, path string, in interface{}) (*http.Response, error) {
 	if c.ua == nil {
-		c.ua = &http.Client{}
+		c.ua = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: c.InsecureSkipVerify,
+				},
+				Proxy: http.ProxyFromEnvironment,
+			},
+		}
 		c.URL = strings.TrimSuffix(c.URL, "/")
 	}
 
