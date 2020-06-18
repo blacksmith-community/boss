@@ -28,11 +28,12 @@ var opt struct {
 
 	Version bool `cli:"-v, --version"`
 
-	URL      string `cli:"-U, --url" env:"BLACKSMITH_URL"`
-	Username string `cli:"-u, --username" env:"BLACKSMITH_USERNAME"`
-	Password string `cli:"-p, --password" env:"BLACKSMITH_PASSWORD"`
+	URL               string `cli:"-U, --url" env:"BLACKSMITH_URL"`
+	SkipSSLValidation bool   `cli:"-k, --skip-ssl-validation" env:"BLACKSMITH_SKIP_VERIFY"`
+	Username          string `cli:"-u, --username" env:"BLACKSMITH_USERNAME"`
+	Password          string `cli:"-p, --password" env:"BLACKSMITH_PASSWORD"`
 
-	Log struct {} `cli:"log, logs"`
+	Log struct{} `cli:"log, logs"`
 
 	List struct {
 		Long bool `cli:"-l, --long"`
@@ -96,6 +97,9 @@ func options() {
 	fmt.Printf("  -U, --url       (@Y{required}) URL of Blacksmith\n")
 	fmt.Printf("                  Defaults to @W{$BLACKSMITH_URL}\n")
 	fmt.Printf("\n")
+	fmt.Printf("  -k, --skip-ssl-validation\n")
+	fmt.Printf("                  Skip verification of the API endpoint\n")
+	fmt.Printf("\n")
 	fmt.Printf("  -u, --username  (@Y{required}) Blacksmith username.\n")
 	fmt.Printf("                  Defaults to @W{$BLACKSMITH_USERNAME}\n")
 	fmt.Printf("\n")
@@ -115,11 +119,12 @@ func bad(command, msg string, args ...interface{}) {
 
 func connect() *Client {
 	return &Client{
-		URL:      opt.URL,
-		Username: opt.Username,
-		Password: opt.Password,
-		Debug:    opt.Debug,
-		Trace:    opt.Trace,
+		URL:                opt.URL,
+		Username:           opt.Username,
+		Password:           opt.Password,
+		InsecureSkipVerify: opt.SkipSSLValidation,
+		Debug:              opt.Debug,
+		Trace:              opt.Trace,
 	}
 }
 
@@ -170,10 +175,10 @@ func main() {
 		}
 
 		c := connect()
-		log, err := c.Log();
+		log, err := c.Log()
 		bail(err)
 
-		fmt.Printf("%s\n", log);
+		fmt.Printf("%s\n", log)
 		os.Exit(0)
 
 	case "list":
