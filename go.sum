@@ -1,0 +1,13 @@
+github.com/jhunt/go-ansi v0.0.0-20181127194324-5fd839f108b6 h1:qAlBkfBj+4aW68SdlhlAiWx+hy7vmchlcAZQRAJFhFI=
+github.com/jhunt/go-ansi v0.0.0-20181127194324-5fd839f108b6/go.mod h1:zx5sSmwzYAXhfPcRBU7SuiAwK+8vC/LTgAoHyJiclzI=
+github.com/jhunt/go-cli v0.0.0-20180120230054-44398e595118 h1:pJkfnav319gBFbol0av+PamHMB2BZ/zocxt6V2dH6+M=
+github.com/jhunt/go-cli v0.0.0-20180120230054-44398e595118/go.mod h1:4FMJrayGZOn7IjEvttdG3BYK1M9HuKvSNa04THRry0I=
+github.com/jhunt/go-envirotron v0.0.0-20171017043611-8bdb90f72b39 h1:3IASOK7xCNcsH6XVbKTDR6nwN1EkQthpRidCLx3PGPw=
+github.com/jhunt/go-envirotron v0.0.0-20171017043611-8bdb90f72b39/go.mod h1:QWmflKt1GHM1Vw7iSqF7CIlbcninGfyRjqjecXjchlU=
+github.com/jhunt/go-snapshot v0.0.0-20171017043618-9ad8f5ee37a2 h1:mGjsfupyBHFg4Gk01Oxw3OHqiBLnIGYbLbaYWRebmgc=
+github.com/jhunt/go-snapshot v0.0.0-20171017043618-9ad8f5ee37a2/go.mod h1:oNu1YULLxQcu77xYyAN0Xb2YbEspiSwDSn9kPW2zRKU=
+github.com/jhunt/go-table v0.0.0-20181127210244-68a841ca53dc/go.mod h1:ws87Lzc/NsPhH1MRRNk2IBANVMHsaQws0NqstHrveaE=
+github.com/mattn/go-isatty v0.0.12 h1:wuysRhFDzyxgEmMf5xjvJ2M9dZoWAXNNr5LSBS7uHXY=
+github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=
+golang.org/x/sys v0.0.0-20200116001909-b77594299b42 h1:vEOn+mP2zCOVzKckCZy6YsCtDblrpj/w7B9nxGNELpg=
+golang.org/x/sys v0.0.0-20200116001909-b77594299b42/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
