@@ -272,3 +272,7 @@ func (c Client) Manifest(id string) (string, error) {
 func (c Client) Creds(id string) (string, error) {
 	return c.text("/b/%s/creds.yml", id)
 }
+
+func (c Client) Redeploy(id string) (string, error) {
+	return c.text("/b/%s/redeploy", id)
+}
