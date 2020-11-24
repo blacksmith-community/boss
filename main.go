@@ -57,6 +57,8 @@ var opt struct {
 	Manifest struct{} `cli:"manifest"`
 
 	Creds struct{} `cli:"creds"`
+
+	Redeploy struct{} `cli:"redeploy"`
 }
 
 func usage(f string, args ...interface{}) {
@@ -79,6 +81,7 @@ func commands() {
 	fmt.Printf("\n")
 	fmt.Printf("  @G{creds}     Print out credentials for a service instance.\n")
 	fmt.Printf("  @G{manifest}  Print an instance's BOSH deployment manifest.\n")
+	fmt.Printf("  @G{redeploy}  Redeploy service instance from saved deployment manifest\n")
 	fmt.Printf("  @G{task}      Show the BOSH deployment task for an instance.\n")
 	fmt.Printf("\n")
 }
@@ -434,6 +437,27 @@ func main() {
 		bail(err)
 		fmt.Printf("# @M{%s}\n", id)
 		fmt.Printf("%s\n", creds)
+		os.Exit(0)
+
+	case "redeploy":
+		if opt.Help {
+			usage("@C{redeploy} @M{instance}")
+			options()
+			os.Exit(0)
+		}
+
+		if len(args) != 1 {
+			bad("manifest", "@R{The `instance' argument is required.}")
+			os.Exit(1)
+		}
+
+		c := connect()
+		id, err := c.Resolve(args[0])
+		bail(err)
+		task, err := c.Redeploy(id)
+		bail(err)
+		fmt.Printf("# @M{%s}\n", id)
+		fmt.Printf("%s\n", task)
 		os.Exit(0)
 
 	case "creds":
