@@ -111,6 +111,35 @@ func options() {
 	fmt.Printf("\n")
 }
 
+func list_options() {
+	fmt.Printf("Command Options:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  -l, --long      Display additonal details about service instances\n")
+	fmt.Printf("\n")
+}
+
+func catalog_options() {
+	fmt.Printf("Command Options:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  -l, --long      Display additonal details about catalog plans\n")
+	fmt.Printf("\n")
+}
+
+func create_options() {
+	fmt.Printf("Command Options:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  -i, --id        Service instance id\n")
+	fmt.Printf("  -f, --follow    Actively display the service log\n")
+	fmt.Printf("\n")
+}
+
+func task_options() {
+	fmt.Printf("Command Options:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  -f, --follow    Actively display the service log\n")
+	fmt.Printf("\n")
+}
+
 func bad(command, msg string, args ...interface{}) {
 	fmt.Printf(msg+"\n", args...)
 	if command == "" {
@@ -186,7 +215,8 @@ func main() {
 
 	case "list":
 		if opt.Help {
-			usage("@C{list}")
+			usage("@C{list} [command_options]|[options]")
+            list_options()
 			options()
 			os.Exit(0)
 		}
@@ -247,7 +277,8 @@ func main() {
 
 	case "catalog":
 		if opt.Help {
-			usage("@C{catalog}")
+			usage("@C{catalog} [command_options]|[options]")
+            catalog_options()
 			options()
 			os.Exit(0)
 		}
@@ -317,7 +348,8 @@ func main() {
 
 	case "create":
 		if opt.Help {
-			usage("@C{create} @M{service/plan}")
+			usage("@C{create} @M{service/plan} [command_options]|[options]")
+            create_options()
 			options()
 			os.Exit(0)
 		}
@@ -383,7 +415,8 @@ func main() {
 
 	case "task":
 		if opt.Help {
-			usage("@C{task} @M{instance}")
+			usage("@C{task} @M{instance} [command_options]|[options]")
+            task_options()
 			options()
 			os.Exit(0)
 		}
@@ -479,6 +512,5 @@ func main() {
 		bail(err)
 		fmt.Printf("# @M{%s}\n", id)
 		fmt.Printf("%s\n", creds)
-		os.Exit(0)
-	}
+		os.Exit(0) }
 }
