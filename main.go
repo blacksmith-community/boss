@@ -216,7 +216,7 @@ func main() {
 	case "list":
 		if opt.Help {
 			usage("@C{list} [command_options]|[options]")
-            list_options()
+			list_options()
 			options()
 			os.Exit(0)
 		}
@@ -278,7 +278,7 @@ func main() {
 	case "catalog":
 		if opt.Help {
 			usage("@C{catalog} [command_options]|[options]")
-            catalog_options()
+			catalog_options()
 			options()
 			os.Exit(0)
 		}
@@ -349,7 +349,7 @@ func main() {
 	case "create":
 		if opt.Help {
 			usage("@C{create} @M{service/plan} [command_options]|[options]")
-            create_options()
+			create_options()
 			options()
 			os.Exit(0)
 		}
@@ -416,7 +416,7 @@ func main() {
 	case "task":
 		if opt.Help {
 			usage("@C{task} @M{instance} [command_options]|[options]")
-            task_options()
+			task_options()
 			options()
 			os.Exit(0)
 		}
@@ -512,5 +512,6 @@ func main() {
 		bail(err)
 		fmt.Printf("# @M{%s}\n", id)
 		fmt.Printf("%s\n", creds)
-		os.Exit(0) }
+		os.Exit(0)
+	}
 }
