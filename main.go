@@ -48,6 +48,10 @@ var opt struct {
 		Follow bool   `cli:"-f, --follow"`
 	} `cli:"create, new"`
 
+	Update struct {
+		Follow bool   `cli:"-f, --follow"`
+	} `cli:"update"`
+
 	Delete struct{} `cli:"delete, rm"`
 
 	Task struct {
@@ -77,6 +81,7 @@ func commands() {
 	fmt.Printf("  @G{log}       Print the Blacksmith Service Broker log file.\n")
 	fmt.Printf("\n")
 	fmt.Printf("  @G{create}    Deploy a new instance of a service + plan.\n")
+	fmt.Printf("  @G{update}    Update a service instance of a service + plan.\n")
 	fmt.Printf("  @G{delete}    Delete a deployed service instance.\n")
 	fmt.Printf("\n")
 	fmt.Printf("  @G{creds}     Print out credentials for a service instance.\n")
@@ -394,6 +399,53 @@ func main() {
 			fmt.Printf("\n")
 		}
 		os.Exit(0)
+
+	case "update":
+		if opt.Help {
+			usage("@C{update} @M{id} @M{service} [command_options]|[options]")
+			create_options()
+			options()
+			os.Exit(0)
+		}
+
+		if len(args) != 1 {
+			bad("update", "@R{The `id' argument is required.}")
+			os.Exit(1)
+		}
+
+		c := connect()
+		id := args[0]
+
+		instances, err := c.Instances()
+		service_id := "(unknown)"
+		for _, instance := range instances {
+			if instance.ID == id {
+				service_id = instance.Service.ID
+			}
+		}
+		_, err = c.Update(id, service_id)
+		bail(err)
+
+		fmt.Printf("Service instance @M{%s} updating.\n", id)
+		if opt.Update.Follow {
+			fmt.Printf("\n@B{tailing deployment task log...}\n")
+			time.Sleep(time.Second)
+			task, _ := c.Task(id)
+			fmt.Printf("%s", task)
+
+			for {
+				time.Sleep(time.Second)
+
+				t, _ := c.Task(id)
+				if len(t) > len(task) {
+					fmt.Printf("%s", t[len(task):])
+					task = t
+				}
+			}
+			fmt.Printf("\n")
+		}
+		os.Exit(0)
+
 
 	case "delete":
 		if opt.Help {
