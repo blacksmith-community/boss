@@ -270,6 +270,17 @@ func (c Client) Create(id, service, plan string) (Instance, error) {
 	return Instance{ID: id}, err
 }
 
+func (c Client) Update(id, service string) (Instance, error) {
+	in := struct {
+		ServiceID string `json:"service_id"`
+	}{
+		ServiceID: "service",
+	}
+
+	_, err := c.request("PATCH", "/v2/service_instances/"+id, in, nil)
+	return Instance{ID: id}, err
+}
+
 func (c Client) Delete(id string) error {
 	_, err := c.request("DELETE", "/v2/service_instances/"+id, nil, nil)
 	return err
