@@ -49,7 +49,7 @@ var opt struct {
 	} `cli:"create, new"`
 
 	Update struct {
-		Follow bool   `cli:"-f, --follow"`
+		Follow bool `cli:"-f, --follow"`
 	} `cli:"update"`
 
 	Delete struct{} `cli:"delete, rm"`
@@ -107,6 +107,7 @@ func options() {
 	fmt.Printf("\n")
 	fmt.Printf("  -k, --skip-ssl-validation\n")
 	fmt.Printf("                  Skip verification of the API endpoint\n")
+	fmt.Printf("                  Defaults to @W{$BLACKSMITH_SKIP_VERIFY}\n")
 	fmt.Printf("\n")
 	fmt.Printf("  -u, --username  (@Y{required}) Blacksmith username.\n")
 	fmt.Printf("                  Defaults to @W{$BLACKSMITH_USERNAME}\n")
@@ -445,7 +446,6 @@ func main() {
 			fmt.Printf("\n")
 		}
 		os.Exit(0)
-
 
 	case "delete":
 		if opt.Help {
