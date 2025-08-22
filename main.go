@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -371,33 +370,21 @@ func main() {
 
 		id := opt.Create.ID
 		if id == "" {
-			rand.Seed(time.Now().UTC().UnixNano())
 			id = RandomName()
 		}
 
 		c := connect()
 		service, plan, err := c.Plan(l[0], l[1])
 		bail(err)
-		_, err = c.Create(id, service.ID, plan.ID)
+		_, err = c.Create(id, service.ID, plan.ID, nil)
 		bail(err)
 
 		fmt.Printf("@G{%s}/@Y{%s} instance @M{%s} created.\n", l[0], l[1], id)
 		if opt.Create.Follow {
 			fmt.Printf("\n@B{tailing deployment task log...}\n")
-			time.Sleep(time.Second)
-			task, _ := c.Task(id)
-			fmt.Printf("%s", task)
-
-			for {
-				time.Sleep(time.Second)
-
-				t, _ := c.Task(id)
-				if len(t) > len(task) {
-					fmt.Printf("%s", t[len(task):])
-					task = t
-				}
+			if err := c.StreamTask(id, true); err != nil {
+				fmt.Fprintf(os.Stderr, "Error streaming task logs: %v\n", err)
 			}
-			fmt.Printf("\n")
 		}
 		os.Exit(0)
 
@@ -418,32 +405,22 @@ func main() {
 		id := args[0]
 
 		instances, err := c.Instances()
+		bail(err)
 		service_id := "(unknown)"
 		for _, instance := range instances {
 			if instance.ID == id {
 				service_id = instance.Service.ID
 			}
 		}
-		_, err = c.Update(id, service_id)
+		_, err = c.Update(id, service_id, "", nil)
 		bail(err)
 
 		fmt.Printf("Service instance @M{%s} updating.\n", id)
 		if opt.Update.Follow {
 			fmt.Printf("\n@B{tailing deployment task log...}\n")
-			time.Sleep(time.Second)
-			task, _ := c.Task(id)
-			fmt.Printf("%s", task)
-
-			for {
-				time.Sleep(time.Second)
-
-				t, _ := c.Task(id)
-				if len(t) > len(task) {
-					fmt.Printf("%s", t[len(task):])
-					task = t
-				}
+			if err := c.StreamTask(id, true); err != nil {
+				fmt.Fprintf(os.Stderr, "Error streaming task logs: %v\n", err)
 			}
-			fmt.Printf("\n")
 		}
 		os.Exit(0)
 

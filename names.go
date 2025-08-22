@@ -1,8 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 )
 
 var (
@@ -345,5 +346,17 @@ var (
 )
 
 func RandomName() string {
-	return fmt.Sprintf("%s-%s", left[rand.Intn(len(left))], right[rand.Intn(len(right))])
+	leftIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(left))))
+	if err != nil {
+		// Fallback to first element if crypto/rand fails
+		leftIndex = big.NewInt(0)
+	}
+
+	rightIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(right))))
+	if err != nil {
+		// Fallback to first element if crypto/rand fails
+		rightIndex = big.NewInt(0)
+	}
+
+	return fmt.Sprintf("%s-%s", left[leftIndex.Int64()], right[rightIndex.Int64()])
 }

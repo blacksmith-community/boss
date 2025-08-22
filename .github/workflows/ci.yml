@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  GO_VERSION: '1.25'
+
+jobs:
+  ci:
+    name: Continuous Integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build
+        run: make build
+
+      - name: Lint (fmt + vet)
+        run: make lint
+
+      - name: Staticcheck
+        run: make staticcheck
+
+      - name: Test
+        run: make test
+
+      - name: Coverage
+        run: make coverage
+
+      - name: Govulncheck
+        run: make govulncheck
+
+      - name: Gosec
+        run: make gosec
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install trivy
+
+      - name: Trivy
+        run: make trivy
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+      - name: Create boss tarball
+        run: tar -czf boss.tar.gz boss
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: boss
+          path: boss.tar.gz
+          retention-days: 1

@@ -1,12 +1,13 @@
-module github.com/jhunt/boss
+module github.com/blacksmith-community/boss
 
-go 1.18
+go 1.25.0
 
 require (
 	github.com/jhunt/go-ansi v0.0.0-20181127194324-5fd839f108b6
 	github.com/jhunt/go-cli v0.0.0-20210225050846-3732873ce073
 	github.com/jhunt/go-envirotron v0.0.0-20191007155228-c8f2a184ad0f
 	github.com/jhunt/go-table v0.0.0-20181127210244-68a841ca53dc
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
