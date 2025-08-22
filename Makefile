@@ -186,7 +186,6 @@ shipit: ## Build release artifacts (requires VERSION env var)
 	@cp artifacts/boss-linux-amd64 boss-$(VERSION)/boss-linux-amd64
 	@cp artifacts/boss-darwin-amd64 boss-$(VERSION)/boss-darwin-amd64
 	@cp artifacts/boss-darwin-arm64 boss-$(VERSION)/boss-darwin-arm64
-	@cp -a ui boss-$(VERSION)
 	@tar -cf - boss-$(VERSION)/ | gzip -9 > artifacts/boss-$(VERSION).tar.gz
 	@tar -cjf artifacts/boss-$(VERSION).tar.bz2 boss-$(VERSION)/
 	@rm -rf boss-$(VERSION)
@@ -195,22 +194,6 @@ shipit: ## Build release artifacts (requires VERSION env var)
 .PHONY: version
 version: ## Display the current version
 	@echo "$(CYAN)Version: $(VERSION)$(RESET)"
-
-##@ Deployment
-
-.PHONY: deploy-ui
-deploy-ui: ## Deploy UI files to BOSH instance (use DEPLOYMENT=name INSTANCE=group/id)
-	@echo "$(GREEN)Deploying UI files to BOSH...$(RESET)"
-	@./deploy-ui-quick.sh $(DEPLOYMENT) $(INSTANCE)
-	@echo "$(GREEN)✓ UI deployed$(RESET)"
-
-.PHONY: deploy-all
-deploy-all: build deploy-ui ## Build and deploy both binary and UI to BOSH
-	@echo "$(GREEN)Deploying boss binary...$(RESET)"
-	@bosh -d $(DEPLOYMENT) scp boss $(INSTANCE):/tmp/boss
-	@bosh -d $(DEPLOYMENT) ssh $(INSTANCE) -c "sudo cp /tmp/boss /var/vcap/packages/boss/bin/boss && sudo chown vcap:vcap /var/vcap/packages/boss/bin/boss && sudo chmod +x /var/vcap/packages/boss/bin/boss"
-	@bosh -d $(DEPLOYMENT) ssh $(INSTANCE) -c "sudo /var/vcap/bosh/bin/monit restart boss"
-	@echo "$(GREEN)✓ Full deployment complete$(RESET)"
 
 ##@ Dependencies
 
