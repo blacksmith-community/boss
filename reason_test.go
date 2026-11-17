@@ -179,6 +179,7 @@ func TestTheWeakKeyFindingIsShownOnlyWhenItMatchesTheBrokersFormat(t *testing.T)
 		}
 	}
 	for name, in := range map[string]string{
+		"six digits":        "The RSA key is only 123456 bits long, which is below today's minimum.",
 		"another algorithm": "The DSA key is only 1024 bits long, which is below today's minimum.",
 		"letters for bits":  "The RSA key is only 10k4 bits long, which is below today's minimum.",
 		"no bits":           "The RSA key is only  bits long, which is below today's minimum.",
