@@ -614,3 +614,14 @@ func TestTheConfirmationPromptLosesControlCharacters(t *testing.T) {
 		t.Errorf("prompt %q", errb)
 	}
 }
+
+func TestAConfirmationPromptStaysOnOneLine(t *testing.T) {
+	for _, name := range []string{"dep\nDelete everything? [y/N] y", "dep\tx"} {
+		r, _, errb := testRunner(newBroker(t, nil).client(), "n\n", false)
+		_ = r.confirm("Delete %s?", name)
+		prompt := strings.TrimSuffix(errb.String(), "\n")
+		if strings.ContainsAny(prompt, "\n\t") || !strings.HasSuffix(prompt, " [y/N] ") {
+			t.Errorf("prompt for %q is %q", name, errb)
+		}
+	}
+}

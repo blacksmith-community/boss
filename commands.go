@@ -64,7 +64,7 @@ func (r *runner) confirm(format string, args ...interface{}) error {
 		return nil
 	}
 
-	_, _ = io.WriteString(r.err, asSent(fmt.Sprintf(format, args...))+" [y/N] ")
+	_, _ = io.WriteString(r.err, cell(fmt.Sprintf(format, args...))+" [y/N] ")
 
 	line, _ := r.in.ReadString('\n')
 	switch strings.ToLower(strings.TrimSpace(line)) {
