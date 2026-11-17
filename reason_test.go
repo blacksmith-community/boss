@@ -47,6 +47,40 @@ func TestAReasonThatMayHoldASecretIsWithheld(t *testing.T) {
 	}
 }
 
+func TestAReasonWithALookalikeLetterIsWithheld(t *testing.T) {
+	for name, in := range map[string]string{
+		"fullwidth letters":         "\uff54\uff4f\uff4b\uff45\uff4e hunter2",
+		"a Cyrillic a":              "p\u0430ss hunter2",
+		"a long s":                  "\u017fecret hunter2",
+		"math bold letters":         "\U0001d429\U0001d41a\U0001d42c\U0001d42c hunter2",
+		"an accented letter":        "caf\u00e9",
+		"a Braille blank split":     "pa\u2800ss hunter2",
+		"a Hangul filler split":     "pa\u3164ss hunter2",
+		"a Braille blank in a word": "tok\u2800en hunter2",
+	} {
+		shown, withheld := reasonText(in)
+		if !withheld || shown != reasonWithheld {
+			t.Errorf("%s: got %q (withheld %v)", name, shown, withheld)
+		}
+	}
+}
+
+func TestEachMarkerAloneWithholdsAReason(t *testing.T) {
+	for name, in := range map[string]string{
+		"the word secret": "the secret is out",
+		"an equals sign":  "size=10",
+		"two slashes":     "go to //host/p",
+		"an at sign":      "mail me@example",
+		"a percent sign":  "a 50% chance",
+		"a quote":         `a "b"`,
+		"a brace":         "a {b}",
+	} {
+		if _, withheld := reasonText(in); !withheld {
+			t.Errorf("%s: %q was shown", name, in)
+		}
+	}
+}
+
 func TestAnOrdinaryReasonIsShownInFull(t *testing.T) {
 	in := "deployment fixture-dep is not a deployment of one of this broker's service instances, so the broker will not change it"
 	shown, withheld := reasonText(in)

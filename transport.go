@@ -675,8 +675,8 @@ var riskyWords = []string{"pass", "pw", "pwd", "secret", "token", "key", "auth",
 // reasonText cleans the broker's reason for display. It fails closed.
 // Control and format characters become spaces first, and then a reason
 // that might hold a secret is withheld entirely, because no pattern can
-// list every shape a secret takes. That means any of = @ % " { or a URL,
-// or any risky word, which over-withholds and is meant to. The second
+// list every shape a secret takes. That means any of = @ % " { or //,
+// a letter outside ASCII, or any risky word, which over-withholds and is meant to. The second
 // result says whether the reason was withheld. A reason that is shown
 // is on one line and cut at 512 runes.
 func reasonText(s string) (string, bool) {
@@ -691,7 +691,7 @@ func reasonText(s string) (string, bool) {
 	// The same text with those characters deleted shows a word that was
 	// split in two to get past the check.
 	joined := strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2800' || r == '\u3164' {
 			return -1
 		}
 		return r
@@ -710,8 +710,15 @@ func reasonText(s string) (string, bool) {
 }
 
 func mayHoldSecret(s string) bool {
-	if strings.ContainsAny(s, "=@%\"{") || strings.Contains(s, "://") || strings.Contains(s, "//") {
+	if strings.ContainsAny(s, "=@%\"{") || strings.Contains(s, "//") {
 		return true
+	}
+	// A letter outside ASCII can stand in for an ASCII one, as a fullwidth
+	// or Cyrillic letter does, so the word check would miss it.
+	for _, r := range s {
+		if r > unicode.MaxASCII && unicode.IsLetter(r) {
+			return true
+		}
 	}
 	lower := strings.ToLower(s)
 	for _, word := range riskyWords {
