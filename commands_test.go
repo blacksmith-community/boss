@@ -166,6 +166,22 @@ func TestCredsSurfacesABrokerErrorBody(t *testing.T) {
 	}
 }
 
+func TestCredsRefusesTheBrokersPlaceholder(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                        "status.json",
+		"GET /b/" + fixtureID + "/credentials": "credentials_placeholder.json",
+	})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	err := r.creds([]string{fixtureID})
+	if err == nil || !strings.Contains(err.Error(), "placeholder") {
+		t.Fatalf("got %v, want a refusal that names the placeholder", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("printed the placeholder as if it were credentials: %s", out)
+	}
+}
+
 func TestLogReadsTheBrokerLogRoute(t *testing.T) {
 	b := newBroker(t, map[string]string{"GET /b/blacksmith/logs": "logs.json"})
 	r, out, _ := testRunner(b.client(), "", true)

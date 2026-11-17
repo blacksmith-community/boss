@@ -607,6 +607,12 @@ func (c Client) Creds(id string) (string, error) {
 		return "", fmt.Errorf("failed to get credentials for %s: %s", id, msg)
 	}
 
+	// Brokers before the fix answer 200 with a stand-in when they hold no
+	// credentials, and showing it would pass for the real thing.
+	if creds["host"] == "10.0.0.1" && creds["username"] == "admin" && creds["password"] == "***" {
+		return "", fmt.Errorf("the broker sent its placeholder credentials for %s, so it holds none for this instance", id)
+	}
+
 	b, err := yaml.Marshal(creds)
 	if err != nil {
 		return "", fmt.Errorf("failed to format credentials for %s: %w", id, err)
