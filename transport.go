@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -111,9 +114,26 @@ func (c Client) do(method, path string, in interface{}) (*http.Response, error) 
 	return c.doWithRetry(method, path, in)
 }
 
-// doWithRetry performs the request with retry logic. Only a GET is sent
-// again after a timeout, because a timed-out POST may have reached the
-// broker and started an action.
+// idempotent says whether a method may be sent again after the broker
+// answered or the connection broke midway.
+func idempotent(method string) bool {
+	return method == http.MethodGet || method == http.MethodHead
+}
+
+// backoff is the pause before the next attempt.
+func (c Client) backoff(attempt int) time.Duration {
+	unit := c.Backoff
+	if unit == 0 {
+		unit = time.Second
+	}
+	return time.Duration(attempt*attempt) * unit
+}
+
+// doWithRetry performs the request with retry logic. A GET or HEAD is sent
+// again after a 5xx answer or a transient error. Any other method is sent
+// again only when the connection was refused, because then no byte reached
+// the broker. A POST, PATCH, PUT, or DELETE that may have arrived is never
+// sent twice.
 func (c Client) doWithRetry(method, path string, in interface{}) (*http.Response, error) {
 	maxRetries := c.MaxRetries
 	if maxRetries == 0 {
@@ -124,47 +144,66 @@ func (c Client) doWithRetry(method, path string, in interface{}) (*http.Response
 	}
 
 	var lastErr error
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Exponential backoff
-			backoff := time.Duration(attempt*attempt) * time.Second
-			if c.Debug {
-				_, _ = fmt.Fprintf(c.stderr(), "Retrying request after %s (attempt %d/%d)\n", backoff, attempt+1, maxRetries+1)
-			}
-			time.Sleep(backoff)
-		}
-
+	for attempts := 1; ; attempts++ {
 		res, err := c.doSingle(method, path, in)
 		if err == nil {
-			return res, nil
+			if res.StatusCode < 500 || !idempotent(method) || attempts > maxRetries {
+				return res, nil
+			}
+
+			_, _ = io.Copy(io.Discard, res.Body)
+			_ = res.Body.Close()
+			lastErr = fmt.Errorf("the broker answered %d", res.StatusCode)
+		} else {
+			lastErr = err
+			if !c.shouldRetry(method, err) || attempts > maxRetries {
+				if attempts == 1 {
+					return nil, err
+				}
+				return nil, fmt.Errorf("request failed after %d attempts: %w", attempts, err)
+			}
 		}
 
-		lastErr = err
+		pause := c.backoff(attempts)
+		if c.Debug {
+			_, _ = fmt.Fprintf(c.stderr(), "Retrying request after %s (attempt %d/%d): %v\n", pause, attempts+1, maxRetries+1, lastErr)
+		}
 
-		// Don't retry certain errors
-		if !c.shouldRetry(method, err) {
-			break
+		select {
+		case <-c.context().Done():
+			return nil, c.context().Err()
+		case <-time.After(pause):
 		}
 	}
+}
 
-	return nil, fmt.Errorf("request failed after %d attempts: %w", maxRetries+1, lastErr)
+// refused says whether the error is a failure to connect, which happens
+// before any byte of the request leaves.
+func refused(err error) bool {
+	var op *net.OpError
+	if errors.As(err, &op) && op.Op == "dial" {
+		return true
+	}
+	return strings.Contains(err.Error(), "connection refused")
 }
 
 // shouldRetry determines if an error is retryable
 func (c Client) shouldRetry(method string, err error) bool {
-	// Don't retry client errors (4xx)
-	if apiErr, ok := err.(APIError); ok {
-		return apiErr.Status >= 500 // Only retry server errors
+	if errors.Is(err, context.Canceled) {
+		return false
 	}
 
-	// A refused connection never reached the broker, so any request may go again.
-	if strings.Contains(err.Error(), "connection refused") {
+	if refused(err) {
 		return true
 	}
 
-	// Other network trouble can leave an action already started.
-	if method != http.MethodGet {
+	if !idempotent(method) {
 		return false
+	}
+
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
 	}
 
 	return strings.Contains(err.Error(), "timeout") ||
@@ -194,7 +233,7 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 		return nil, err
 	}
 
-	req, err := http.NewRequest(method, target, body)
+	req, err := http.NewRequestWithContext(c.context(), method, target, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

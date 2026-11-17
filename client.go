@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -87,9 +88,20 @@ type Client struct {
 	Space string
 	// Stderr receives debug and trace output (default: os.Stderr)
 	Stderr io.Writer
+	// Backoff is the unit of the pause between attempts (default: 1s)
+	Backoff time.Duration
+	// Ctx ends any request in flight when it is done (default: never)
+	Ctx context.Context
 	// CommandKey is the second credential a broker asks for before it
 	// shows or resumes a batch command job
 	CommandKey string
+}
+
+func (c Client) context() context.Context {
+	if c.Ctx == nil {
+		return context.Background()
+	}
+	return c.Ctx
 }
 
 func (c Client) stderr() io.Writer {
