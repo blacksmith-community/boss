@@ -178,3 +178,95 @@ func TestADirectorErrorInATaskPrintsAsSent(t *testing.T) {
 		}
 	})
 }
+
+// withText swaps one piece of a fixture for the leaky text.
+func withText(t *testing.T, file, old, with string) string {
+	t.Helper()
+	s := fixture(t, file)
+	if !strings.Contains(s, old) {
+		t.Fatalf("%s lacks %q", file, old)
+	}
+	return strings.Replace(s, old, with, 1)
+}
+
+func TestEveryPlaceThatShowsServerTextAppliesTheReasonRule(t *testing.T) {
+	const bad = leakyText
+	finding := `{"findings":[{"severity":"warning","code":"x","message":"` + bad + `"}],`
+	cases := map[string]func(t *testing.T) string{
+		"a finding": func(t *testing.T) string {
+			b := newBroker(t, nil)
+			b.route("GET /b/certificates/items/c0ffee01", func(int) reply {
+				return reply{Status: 200, Body: strings.Replace(fixture(t, "cert_item.json"), "{", finding, 1)}
+			})
+			r, out, _ := testRunner(b.client(), "", true)
+			_ = r.certShow([]string{"c0ffee01"})
+			return out.String()
+		},
+		"a blocked preview": func(t *testing.T) string {
+			return previewOutput(t, withText(t, "cert_preview.json", `"blocked": null`, `"blocked": {"code":"x","message":"`+bad+`"}`))
+		},
+		"a preview warning": func(t *testing.T) string {
+			return previewOutput(t, withText(t, "cert_preview.json", "fixture warning text", bad))
+		},
+		"an orphan reason": func(t *testing.T) string {
+			b := newBroker(t, nil)
+			body := withText(t, "orphans.json", "no_bosh_deployment", bad)
+			b.route("GET /b/orphans", func(int) reply { return reply{Status: 200, Body: body} })
+			r, out, _ := testRunner(b.client(), "", true)
+			_ = r.orphans(nil)
+			return out.String()
+		},
+		"a failed task in the list": func(t *testing.T) string {
+			b := newBroker(t, nil)
+			body := withText(t, "bosh_tasks.json", `"error": "fixture failure text"`, `"error": "`+bad+`"`)
+			b.route("GET /b/tasks", func(int) reply { return reply{Status: 200, Body: body} })
+			r, out, _ := testRunner(b.client(), "", true)
+			_ = r.tasksList(nil, TaskFilter{})
+			return out.String()
+		},
+		"a batch pause reason": func(t *testing.T) string {
+			return batchShowOutput(t, withText(t, "batch_job.json", `"paused": false,`, `"paused": true, "pause_reason": "`+bad+`",`))
+		},
+		"a batch instance error": func(t *testing.T) string {
+			return batchShowOutput(t, withText(t, "batch_job.json", "fixture deploy failed", bad))
+		},
+		"a failed operation": func(t *testing.T) string {
+			b := followBroker(t)
+			body := withText(t, "osb_last_operation_failed.json", "fixture failure text", bad)
+			b.route("GET /v2/service_instances/"+fixtureID+"/last_operation", func(int) reply { return reply{Status: 200, Body: body} })
+			r, cancel := followRunner(t, b)
+			defer cancel()
+			err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{}))
+			if err == nil {
+				return ""
+			}
+			return err.Error()
+		},
+	}
+	for name, run := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := run(t)
+			if got == "" || leaks(got) || !strings.Contains(got, reasonWithheld) {
+				t.Errorf("got %q", got)
+			}
+		})
+	}
+}
+
+func previewOutput(t *testing.T, body string) string {
+	t.Helper()
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.route("POST /b/certificates/rotation/preview", func(int) reply { return reply{Status: 200, Body: body} })
+	r, out, _ := testRunner(b.client(), "", false)
+	_ = r.certPreview([]string{fixtureID}, []string{"server_tls"}, "redeploy", "pending")
+	return out.String()
+}
+
+func batchShowOutput(t *testing.T, body string) string {
+	t.Helper()
+	b := newBroker(t, nil)
+	b.route("GET /b/upgrade/tasks/fixture-batch-0001", func(int) reply { return reply{Status: 200, Body: body} })
+	r, out, _ := testRunner(b.client(), "", true)
+	_ = r.batchShow([]string{"fixture-batch-0001"})
+	return out.String()
+}
