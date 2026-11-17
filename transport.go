@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -90,18 +91,67 @@ func timedOut(err error) bool {
 	return errors.As(err, &ne) && ne.Timeout()
 }
 
+// transports holds the one Transport each TLS setting needs. Every
+// request of the process shares them, so a long follow reuses its
+// connections instead of leaving a new one open each time.
+var transports sync.Map
+
+// transport returns the shared Transport for the client's TLS setting.
+// Boss never sets an Idempotency-Key header, so Go never sends a POST,
+// PATCH, or DELETE again on its own after a reused connection breaks.
+func (c Client) transport() *http.Transport {
+	if t, ok := transports.Load(c.InsecureSkipVerify); ok {
+		return t.(*http.Transport)
+	}
+
+	t := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// #nosec G402 -- InsecureSkipVerify is a configurable option for development environments
+			// and connecting to services with self-signed certificates. User must explicitly enable it.
+			InsecureSkipVerify: c.InsecureSkipVerify,
+		},
+		Proxy:           http.ProxyFromEnvironment,
+		IdleConnTimeout: 90 * time.Second,
+	}
+	actual, _ := transports.LoadOrStore(c.InsecureSkipVerify, t)
+	return actual.(*http.Transport)
+}
+
+// RedirectError says why Boss did not follow a redirect.
+type RedirectError struct {
+	Method string
+	Target string
+	Reason string
+}
+
+func (e RedirectError) Error() string {
+	return fmt.Sprintf("the broker answered a %s request with a redirect to %s, which Boss does not follow because %s", e.Method, e.Target, e.Reason)
+}
+
+// checkRedirect follows a redirect only for a read, and only within the
+// same scheme and host, so an action is never sent anywhere the operator
+// did not name and the command key never leaves the broker.
+func checkRedirect(req *http.Request, via []*http.Request) error {
+	first := via[0]
+	target := req.URL.Redacted()
+
+	switch {
+	case first.Method != http.MethodGet && first.Method != http.MethodHead:
+		return RedirectError{Method: first.Method, Target: target, Reason: "an action must not be sent twice or to another place"}
+	case req.URL.Scheme != first.URL.Scheme || req.URL.Host != first.URL.Host:
+		return RedirectError{Method: first.Method, Target: target, Reason: "it changes the scheme or the host"}
+	case len(via) >= 10:
+		return RedirectError{Method: first.Method, Target: target, Reason: "there were too many redirects"}
+	}
+	return nil
+}
+
 // httpClient builds the HTTP client for one request.
 func (c Client) httpClient() *http.Client {
 	return &http.Client{
-		Timeout: c.requestTimeout(),
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				// #nosec G402 -- InsecureSkipVerify is a configurable option for development environments
-				// and connecting to services with self-signed certificates. User must explicitly enable it.
-				InsecureSkipVerify: c.InsecureSkipVerify,
-			},
-			Proxy: http.ProxyFromEnvironment,
-		},
+		Timeout:       c.requestTimeout(),
+		Transport:     c.transport(),
+		CheckRedirect: checkRedirect,
 	}
 }
 
