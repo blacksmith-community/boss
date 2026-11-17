@@ -432,17 +432,27 @@ func (c Client) Create(id, service, plan string, params map[string]interface{}) 
 	return Instance{ID: id}, nil
 }
 
-// Update modifies an existing service instance with new service, plan, or parameters.
-// This method supports asynchronous operations and will add the accepts_incomplete=true parameter.
-func (c Client) Update(id, service, plan string, params map[string]interface{}) (Instance, error) {
+// Update modifies an existing service instance with new parameters or a
+// new plan. When the plan changes, previousPlan names the plan the
+// instance had, as the Open Service Broker API asks. This method supports
+// asynchronous operations and adds accepts_incomplete=true.
+func (c Client) Update(id, service, plan, previousPlan string, params map[string]interface{}) (Instance, error) {
+	type previous struct {
+		ServiceID string `json:"service_id,omitempty"`
+		PlanID    string `json:"plan_id,omitempty"`
+	}
 	in := struct {
 		ServiceID  string                 `json:"service_id"`
 		PlanID     string                 `json:"plan_id,omitempty"`
 		Parameters map[string]interface{} `json:"parameters,omitempty"`
+		Previous   *previous              `json:"previous_values,omitempty"`
 	}{
 		ServiceID:  service,
 		PlanID:     plan,
 		Parameters: params,
+	}
+	if plan != "" && previousPlan != "" {
+		in.Previous = &previous{ServiceID: service, PlanID: previousPlan}
 	}
 
 	_, err := c.request("PATCH", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, nil)

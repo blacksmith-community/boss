@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 // errAborted is what a command returns when the operator declines to
@@ -211,4 +213,161 @@ func (r *runner) redeploy(args []string, restart bool) error {
 	r.printf("%s of deployment %s started as BOSH task %d (%s).\n", res.Operation, res.Deployment, res.TaskID, res.State)
 	r.printf("Follow it with: boss task --follow %s\n", id)
 	return nil
+}
+
+// parseParams reads provisioning or update parameters. A value that
+// starts with an opening brace is JSON. Anything else names a file that
+// holds JSON or YAML.
+func parseParams(value string) (map[string]interface{}, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+
+	text := value
+	if !strings.HasPrefix(strings.TrimSpace(value), "{") {
+		b, err := os.ReadFile(strings.TrimPrefix(value, "@"))
+		if err != nil {
+			return nil, fmt.Errorf("cannot read parameters file: %w", err)
+		}
+		text = string(b)
+	}
+
+	// YAML is a superset of JSON, so one parser reads both.
+	var raw map[interface{}]interface{}
+	if err := yaml.Unmarshal([]byte(text), &raw); err != nil {
+		return nil, fmt.Errorf("parameters are not valid JSON or YAML: %w", err)
+	}
+
+	out, ok := normalize(raw).(map[string]interface{})
+	if !ok {
+		return nil, errors.New("parameters must be an object")
+	}
+	return out, nil
+}
+
+// normalize turns the maps yaml.v2 reads into maps that encode as JSON.
+func normalize(v interface{}) interface{} {
+	switch t := v.(type) {
+	case map[interface{}]interface{}:
+		m := make(map[string]interface{}, len(t))
+		for k, val := range t {
+			m[fmt.Sprint(k)] = normalize(val)
+		}
+		return m
+	case []interface{}:
+		for i := range t {
+			t[i] = normalize(t[i])
+		}
+	}
+	return v
+}
+
+// create provisions a service instance.
+func (r *runner) create(args []string, id, paramValue string, follow bool) error {
+	if len(args) != 1 {
+		return usageErr("The `service/plan' argument is required.")
+	}
+	l := strings.SplitN(args[0], "/", 2)
+	if len(l) != 2 {
+		return usageErr("The argument must look like service/plan.")
+	}
+
+	params, err := parseParams(paramValue)
+	if err != nil {
+		return err
+	}
+
+	if id == "" {
+		id = RandomName()
+	}
+
+	service, plan, err := r.c.Plan(l[0], l[1])
+	if err != nil {
+		return err
+	}
+
+	if err := r.confirm("Create instance %s of %s/%s in org %s and space %s?", id, l[0], l[1], r.c.org(), r.c.space()); err != nil {
+		return err
+	}
+
+	if _, err := r.c.Create(id, service.ID, plan.ID, params); err != nil {
+		return err
+	}
+
+	r.printf("%s/%s instance %s created.\n", l[0], l[1], id)
+	if follow {
+		r.printf("\ntailing deployment task log...\n")
+		return r.followEvents(id, 0)
+	}
+	return nil
+}
+
+// update changes the parameters or the plan of an instance.
+func (r *runner) update(args []string, paramValue, planName string, follow bool) error {
+	if len(args) != 1 {
+		return usageErr("The `instance' argument is required.")
+	}
+
+	params, err := parseParams(paramValue)
+	if err != nil {
+		return err
+	}
+	if params == nil && planName == "" {
+		return usageErr("Give --params, --plan, or both; there is nothing to update.")
+	}
+
+	ref, err := r.c.Lookup(args[0])
+	if err != nil {
+		return err
+	}
+
+	planID := ""
+	if planName != "" {
+		cat, err := r.c.Catalog()
+		if err != nil {
+			return err
+		}
+		planID, err = findPlan(cat, ref.ServiceID, planName)
+		if err != nil {
+			return err
+		}
+	}
+
+	what := "parameters"
+	if planName != "" {
+		what = "plan " + planName
+		if params != nil {
+			what += " and parameters"
+		}
+	}
+	if err := r.confirm("Update the %s of instance %s?", what, ref.ID); err != nil {
+		return err
+	}
+
+	if _, err := r.c.Update(ref.ID, ref.ServiceID, planID, ref.PlanID, params); err != nil {
+		return err
+	}
+
+	r.printf("Service instance %s updating.\n", ref.ID)
+	if follow {
+		r.printf("\ntailing deployment task log...\n")
+		return r.followEvents(ref.ID, 0)
+	}
+	return nil
+}
+
+// findPlan finds a plan of a service by name or ID.
+func findPlan(cat Catalog, serviceID, plan string) (string, error) {
+	for _, s := range cat.Services {
+		if s.ID != serviceID {
+			continue
+		}
+		for _, p := range s.Plans {
+			if p.ID == plan || p.Name == plan {
+				return p.ID, nil
+			}
+		}
+		return "", fmt.Errorf("service '%s' has no plan '%s'", s.Name, plan)
+	}
+	return "", fmt.Errorf("service '%s' is not in the catalog", serviceID)
 }

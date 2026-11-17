@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"strings"
 
 	fmt "github.com/jhunt/go-ansi"
 	"github.com/jhunt/go-cli"
@@ -53,10 +52,13 @@ var opt struct {
 	Create struct {
 		ID     string `cli:"-i, --id"`
 		Follow bool   `cli:"-f, --follow"`
+		Params string `cli:"-c, --params"`
 	} `cli:"create, new"`
 
 	Update struct {
-		Follow bool `cli:"-f, --follow"`
+		Follow bool   `cli:"-f, --follow"`
+		Params string `cli:"-c, --params"`
+		Plan   string `cli:"--plan"`
 	} `cli:"update"`
 
 	Delete struct{} `cli:"delete, rm"`
@@ -147,6 +149,18 @@ func create_options() {
 	fmt.Printf("\n")
 	fmt.Printf("  -i, --id        Service instance id\n")
 	fmt.Printf("  -f, --follow    Actively display the service log\n")
+	fmt.Printf("  -c, --params    Provisioning parameters, as JSON or the path of\n")
+	fmt.Printf("                  a JSON or YAML file\n")
+	fmt.Printf("\n")
+}
+
+func update_options() {
+	fmt.Printf("Command Options:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  -f, --follow    Actively display the service log\n")
+	fmt.Printf("  -c, --params    Update parameters, as JSON or the path of\n")
+	fmt.Printf("                  a JSON or YAML file\n")
+	fmt.Printf("  --plan NAME     Move the instance to another plan of its service\n")
 	fmt.Printf("\n")
 }
 
@@ -407,69 +421,20 @@ func main() {
 			os.Exit(0)
 		}
 
-		if len(args) != 1 {
-			bad("create", "@R{The `service/plan' argument is required.}")
-			os.Exit(1)
-		}
-		l := strings.SplitN(args[0], "/", 2)
-		if len(l) != 2 {
-			os.Exit(1)
-		}
-
-		id := opt.Create.ID
-		if id == "" {
-			id = RandomName()
-		}
-
 		c := connect()
-		service, plan, err := c.Plan(l[0], l[1])
-		bail(err)
-		_, err = c.Create(id, service.ID, plan.ID, nil)
-		bail(err)
-
-		fmt.Printf("@G{%s}/@Y{%s} instance @M{%s} created.\n", l[0], l[1], id)
-		if opt.Create.Follow {
-			fmt.Printf("\n@B{tailing deployment task log...}\n")
-			if err := newRunner(c, ctx).followEvents(id, 0); err != nil {
-				fmt.Fprintf(os.Stderr, "Error streaming task logs: %v\n", err)
-			}
-		}
+		finish("create", newRunner(c, ctx).create(args, opt.Create.ID, opt.Create.Params, opt.Create.Follow))
 		os.Exit(0)
 
 	case "update":
 		if opt.Help {
-			usage("@C{update} @M{id} @M{service} [command_options]|[options]")
-			create_options()
+			usage("@C{update} @M{instance} [command_options]|[options]")
+			update_options()
 			options()
 			os.Exit(0)
 		}
 
-		if len(args) != 1 {
-			bad("update", "@R{The `id' argument is required.}")
-			os.Exit(1)
-		}
-
 		c := connect()
-		id := args[0]
-
-		instances, err := c.Instances()
-		bail(err)
-		service_id := "(unknown)"
-		for _, instance := range instances {
-			if instance.ID == id {
-				service_id = instance.Service.ID
-			}
-		}
-		_, err = c.Update(id, service_id, "", nil)
-		bail(err)
-
-		fmt.Printf("Service instance @M{%s} updating.\n", id)
-		if opt.Update.Follow {
-			fmt.Printf("\n@B{tailing deployment task log...}\n")
-			if err := newRunner(c, ctx).followEvents(id, 0); err != nil {
-				fmt.Fprintf(os.Stderr, "Error streaming task logs: %v\n", err)
-			}
-		}
+		finish("update", newRunner(c, ctx).update(args, opt.Update.Params, opt.Update.Plan, opt.Update.Follow))
 		os.Exit(0)
 
 	case "delete":

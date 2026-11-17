@@ -1,0 +1,4 @@
+maxmemory: 256mb
+nested:
+  flag: true
+  list: [1, 2]
