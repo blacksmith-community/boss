@@ -134,6 +134,12 @@ var opt struct {
 		} `cli:"errand"`
 	} `cli:"deployment, deployments"`
 
+	Resurrection struct {
+		On    struct{} `cli:"on"`
+		Off   struct{} `cli:"off"`
+		Reset struct{} `cli:"reset"`
+	} `cli:"resurrection"`
+
 	Manifest struct{} `cli:"manifest"`
 
 	Creds struct{} `cli:"creds"`
@@ -297,6 +303,18 @@ func deployment_options() {
 	fmt.Printf("  @G{deployment errand}    Run an errand, after asking.  The arguments are the\n")
 	fmt.Printf("                         deployment and the errand.  Option: --instance GROUP/ID\n")
 	fmt.Printf("                         (repeatable)\n")
+	fmt.Printf("\n")
+}
+
+func resurrection_options() {
+	fmt.Printf("Each subcommand takes an instance, or @W{blacksmith} for the broker itself.\n")
+	fmt.Printf("\n")
+	fmt.Printf("Subcommands:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  @G{resurrection on}     Let BOSH resurrect missing VMs, after asking.\n")
+	fmt.Printf("  @G{resurrection off}    Stop BOSH from resurrecting VMs, after asking.\n")
+	fmt.Printf("  @G{resurrection reset}  Remove the setting so the director's default\n")
+	fmt.Printf("                        applies, after asking.\n")
 	fmt.Printf("\n")
 }
 
@@ -696,6 +714,17 @@ func main() {
 		default:
 			finish(command, r.deploymentOp(args, strings.TrimPrefix(command, "deployment ")))
 		}
+		os.Exit(0)
+
+	case "resurrection", "resurrection on", "resurrection off", "resurrection reset":
+		if opt.Help || command == "resurrection" {
+			usage("@C{resurrection} @M{on|off|reset} @M{instance}")
+			resurrection_options()
+			options()
+			os.Exit(0)
+		}
+
+		finish(command, newRunner(connect(), ctx).resurrection(args, strings.TrimPrefix(command, "resurrection ")))
 		os.Exit(0)
 
 	case "manifest":
