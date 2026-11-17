@@ -1,1 +1,5 @@
-{"success": true, "message": "Resurrection enabled for deployment small-11111111-aaaa-bbbb-cccc-000000000001", "enabled": true}
+{
+  "enabled": true,
+  "message": "Resurrection enabled for deployment redis-small-11111111",
+  "success": true
+}

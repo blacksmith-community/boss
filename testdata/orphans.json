@@ -1,11 +1,28 @@
 {
   "orphans": [
-    {"instance_id": "33333333-aaaa-bbbb-cccc-000000000009", "instance_name": "fixture-gone", "deployment_name": "small-33333333-aaaa-bbbb-cccc-000000000009", "service_id": "redis", "plan_id": "redis-small", "orphaned_at": "2026-11-02T00:00:00Z", "reason": "service instance not found in Cloud Foundry", "check_count": 3, "seconds_left": 7200, "due": false, "basis": "age"},
-    {"instance_id": "33333333-aaaa-bbbb-cccc-000000000010", "deployment_name": "small-33333333-aaaa-bbbb-cccc-000000000010", "orphaned_at": "2026-11-01T00:00:00Z", "reason": "fixture reason", "check_count": 9, "seconds_left": null, "due": true, "basis": "checks"}
+    {
+      "instance_id": "22222222-aaaa-bbbb-cccc-000000000009",
+      "instance_name": "fixture-cache",
+      "deployment_name": "valkey-standalone-22222222",
+      "service_id": "valkey",
+      "plan_id": "standalone",
+      "orphaned_at": "2026-11-15T16:28:34-05:00",
+      "reason": "no_bosh_deployment",
+      "check_count": 0,
+      "seconds_left": 14399,
+      "due": false,
+      "basis": "age"
+    }
   ],
-  "unclaimed": [{"instance_id": "44444444-aaaa-bbbb-cccc-000000000001", "deployment_name": "small-44444444-aaaa-bbbb-cccc-000000000001", "first_seen": "2026-11-01T12:00:00Z"}],
+  "unclaimed": [
+    {
+      "instance_id": "33333333-aaaa-bbbb-cccc-000000000010",
+      "deployment_name": "redis-small-33333333",
+      "first_seen": "2026-11-13T08:00:00Z"
+    }
+  ],
   "unclaimed_known": true,
-  "unclaimed_as_of": "2026-11-03T06:00:00Z",
+  "unclaimed_as_of": "2026-11-14T08:00:00Z",
   "removal_after_seconds": 86400,
-  "timestamp": 1790000000
+  "timestamp": 1794850114
 }

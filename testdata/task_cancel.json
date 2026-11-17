@@ -1,1 +1,6 @@
-{"task_id": 4242, "cancelled": true, "force": false, "message": "Task 4242 cancelled successfully"}
+{
+  "cancelled": true,
+  "force": false,
+  "message": "Task 5103 cancelled successfully",
+  "task_id": 5103
+}

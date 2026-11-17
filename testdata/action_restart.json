@@ -1,1 +1,7 @@
-{"instance_id": "11111111-aaaa-bbbb-cccc-000000000001", "deployment": "small-11111111-aaaa-bbbb-cccc-000000000001", "operation": "restart", "task_id": 4243, "state": "queued"}
+{
+  "instance_id": "7a1b",
+  "deployment": "redis-small-7a1b",
+  "operation": "restart",
+  "task_id": 4321,
+  "state": "queued"
+}

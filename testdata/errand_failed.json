@@ -1,0 +1,26 @@
+{
+  "deployment": "fixture-dep",
+  "errand": "smoke-tests",
+  "exit_code": 1,
+  "instance": "node",
+  "instance_id": "fixture-uuid-1",
+  "results": [
+    {
+      "exit_code": 0,
+      "instance": "node",
+      "instance_id": "fixture-uuid-0",
+      "stderr": "",
+      "stdout": "all fixture checks passed"
+    },
+    {
+      "exit_code": 1,
+      "instance": "node",
+      "instance_id": "fixture-uuid-1",
+      "stderr": "fixture stderr",
+      "stdout": "fixture check failed"
+    }
+  ],
+  "skipped": false,
+  "stderr": "fixture stderr",
+  "stdout": "fixture check failed"
+}

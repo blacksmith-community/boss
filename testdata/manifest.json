@@ -1,4 +1,18 @@
 {
-  "text": "name: small-11111111-aaaa-bbbb-cccc-000000000001\nreleases:\n- name: redis\n  version: 1.2.3\ninstance_groups:\n- name: standalone\n  instances: 1\n",
-  "parsed": {"name": "small-11111111-aaaa-bbbb-cccc-000000000001", "releases": [{"name": "redis", "version": "1.2.3"}], "instance_groups": [{"name": "standalone", "instances": 1}]}
+  "parsed": {
+    "instance_groups": [
+      {
+        "instances": 1,
+        "name": "redis"
+      }
+    ],
+    "name": "redis-small-11111111",
+    "releases": [
+      {
+        "name": "redis-forge",
+        "version": "latest"
+      }
+    ]
+  },
+  "text": "name: redis-small-11111111\nreleases:\n- name: redis-forge\n  version: latest\ninstance_groups:\n- name: redis\n  instances: 1\n"
 }

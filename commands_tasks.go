@@ -23,12 +23,12 @@ func (r *runner) table(headers []string, rows [][]string) {
 	t.Output(r.out)
 }
 
-// unixTime shows a unix timestamp, or a dash when there is none.
-func unixTime(sec int64) string {
-	if sec <= 0 {
+// clock shows a time in UTC, or a dash when the time is not set.
+func clock(t time.Time) string {
+	if t.IsZero() {
 		return "-"
 	}
-	return time.Unix(sec, 0).UTC().Format("2006-01-02 15:04:05")
+	return t.UTC().Format("2006-01-02 15:04:05")
 }
 
 // taskID reads a BOSH task number from an argument.
@@ -50,18 +50,23 @@ func (r *runner) tasksList(args []string, f TaskFilter) error {
 	if err != nil {
 		return err
 	}
-	if len(list.Tasks) == 0 {
+	if len(list.Tasks) == 0 && !list.HasMore {
 		r.printf("No BOSH tasks found.\n")
 		return nil
 	}
 
-	rows := make([][]string, 0, len(list.Tasks))
-	for _, t := range list.Tasks {
-		rows = append(rows, []string{strconv.Itoa(t.ID), t.State, t.Deployment, t.Description, unixTime(t.StartedAt)})
+	if len(list.Tasks) > 0 {
+		rows := make([][]string, 0, len(list.Tasks))
+		for _, t := range list.Tasks {
+			rows = append(rows, []string{strconv.Itoa(t.ID), t.State, t.Deployment, t.Description, clock(t.StartedAt)})
+		}
+		r.table([]string{"Task", "State", "Deployment", "Description", "Started"}, rows)
 	}
-	r.table([]string{"Task", "State", "Deployment", "Description", "Started"}, rows)
 
-	if list.HasMore {
+	switch {
+	case list.HasMore && list.Ceiling:
+		r.printf("\nThe broker lists no deeper than this, so older tasks are out of reach. Narrow the list with --state or --type.\n")
+	case list.HasMore:
 		r.printf("\nMore tasks follow; raise --offset to see them.\n")
 	}
 	return nil
@@ -113,6 +118,15 @@ func progress(done, total int) string {
 	return fmt.Sprintf("%d/%d", done, total)
 }
 
+// batchKind names a batch job's kind. The broker leaves the kind out for a
+// plain stemcell or release upgrade, which was the only kind there was.
+func batchKind(kind string) string {
+	if kind == "" {
+		return "upgrade"
+	}
+	return kind
+}
+
 // batchList prints the batch jobs.
 func (r *runner) batchList(args []string) error {
 	if len(args) != 0 {
@@ -130,7 +144,7 @@ func (r *runner) batchList(args []string) error {
 
 	rows := make([][]string, 0, len(jobs))
 	for _, j := range jobs {
-		rows = append(rows, []string{j.ID, j.Name, j.Kind, j.Status, j.Target,
+		rows = append(rows, []string{j.ID, j.Name, batchKind(j.Kind), j.Status, j.Target,
 			progress(j.CompletedCount, j.TotalCount), strconv.Itoa(j.FailedCount),
 			j.CreatedAt.UTC().Format("2006-01-02 15:04:05")})
 	}
@@ -157,7 +171,7 @@ func (r *runner) batchShow(args []string) error {
 	if j.Name != "" {
 		r.printf("Name:    %s\n", j.Name)
 	}
-	r.printf("Kind:    %s\n", j.Kind)
+	r.printf("Kind:    %s\n", batchKind(j.Kind))
 	r.printf("Status:  %s\n", state)
 	if j.PauseReason != "" {
 		r.printf("Paused:  %s\n", j.PauseReason)
@@ -165,7 +179,11 @@ func (r *runner) batchShow(args []string) error {
 	r.printf("Target:  %s\n", j.target())
 	r.printf("Counts:  %d total, %d completed, %d failed, %d unknown, %d skipped, %d cancelled\n",
 		j.TotalCount, j.CompletedCount, j.FailedCount, j.UnknownCount, j.SkippedCount, j.CancelledCount)
-	r.printf("Created: %s by %s\n\n", j.CreatedAt.UTC().Format("2006-01-02 15:04:05"), j.CreatedBy)
+	created := j.CreatedAt.UTC().Format("2006-01-02 15:04:05")
+	if j.CreatedBy != "" {
+		created += " by " + j.CreatedBy
+	}
+	r.printf("Created: %s\n\n", created)
 
 	rows := make([][]string, 0, len(j.Instances))
 	for _, i := range j.Instances {

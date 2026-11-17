@@ -1,1 +1,3 @@
-{"success": false, "error": "Failed to update resurrection config"}
+{
+  "error": "failed to toggle resurrection: director refused"
+}

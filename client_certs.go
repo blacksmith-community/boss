@@ -64,8 +64,11 @@ type CertSummary struct {
 
 // CertInventory is the answer to GET /b/certificates/inventory.
 type CertInventory struct {
-	GeneratedAt  time.Time     `json:"generated_at"`
-	Summary      CertSummary   `json:"summary"`
+	GeneratedAt time.Time   `json:"generated_at"`
+	Summary     CertSummary `json:"summary"`
+	// Filtered counts what the request's filters matched. The broker
+	// sends it whether or not a filter was set.
+	Filtered     CertSummary   `json:"filtered"`
 	Certificates []Certificate `json:"certificates"`
 }
 

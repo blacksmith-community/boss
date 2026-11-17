@@ -1,0 +1,5 @@
+{
+  "code": "internal_error",
+  "error": "restart of deployment redis-small-7a1b: director refused the job-state change",
+  "success": false
+}

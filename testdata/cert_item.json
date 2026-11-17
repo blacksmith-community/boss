@@ -1,1 +1,67 @@
-{"id": "cert-aaaa-0001", "key": "/fixture/small/redis_tls", "owners": [{"kind": "instance", "instance_id": "11111111-aaaa-bbbb-cccc-000000000001", "instance_name": "fixture-one"}], "kind": "leaf", "common_name": "fixture-one.example.test", "issuer": "Fixture CA", "effective_not_after": "2026-11-20T00:00:00Z", "days_left": 17, "expiry": "critical", "health": "ok", "attention": true, "findings": [{"code": "expiring", "severity": "warning", "message": "expires within 30 days"}], "rotation": {"allowed": true, "modes": ["redeploy", "patch"]}, "pem": "-----BEGIN CERTIFICATE-----\nFIXTURE-NOT-A-REAL-CERTIFICATE\n-----END CERTIFICATE-----\n", "facts": {}, "issuer_chain": []}
+{
+  "id": "c0ffee01",
+  "key": "/fixture/redis/server_tls",
+  "owners": [
+    {
+      "kind": "instance",
+      "instance_id": "11111111-aaaa-bbbb-cccc-000000000001",
+      "instance_name": "fixture-redis",
+      "deployment": "redis-small-11111111",
+      "service_name": "redis",
+      "plan_name": "small"
+    }
+  ],
+  "affected_instances": 1,
+  "variable": "server_tls",
+  "kind": "",
+  "common_name": "fixture.redis.internal",
+  "issuer": "fixture-ca",
+  "dns_names": [
+    "fixture.redis.internal"
+  ],
+  "key_algorithm": "RSA",
+  "key_bits": 2048,
+  "effective_not_after": "2026-12-04T08:00:00Z",
+  "days_left": 20,
+  "expiry": "warning",
+  "health": "ok",
+  "attention": true,
+  "observations": [
+    {
+      "source": "credhub",
+      "owner": {
+        "kind": "instance",
+        "instance_id": "11111111-aaaa-bbbb-cccc-000000000001",
+        "instance_name": "fixture-redis",
+        "deployment": "redis-small-11111111",
+        "service_name": "redis",
+        "plan_name": "small"
+      },
+      "locator": "/fixture/redis/server_tls",
+      "not_after": "2026-12-04T08:00:00Z",
+      "state": "ok",
+      "observed_at": "2026-11-14T08:00:00Z"
+    }
+  ],
+  "coverage": {
+    "expected_listeners": 0,
+    "observed_listeners": 0,
+    "failed_listeners": 0,
+    "complete": false,
+    "stale": false,
+    "oldest_observation": "0001-01-01T00:00:00Z",
+    "source_states": null
+  },
+  "rotation": {
+    "allowed": true,
+    "modes": [
+      "redeploy",
+      "patch"
+    ]
+  },
+  "pem": "-----BEGIN CERTIFICATE-----\nZml4dHVyZQ==\n-----END CERTIFICATE-----\n",
+  "facts": {
+    "not_before": "0001-01-01T00:00:00Z",
+    "not_after": "0001-01-01T00:00:00Z"
+  }
+}

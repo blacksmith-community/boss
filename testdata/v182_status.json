@@ -1,0 +1,34 @@
+{
+  "bosh": "connected",
+  "commit": "0000000",
+  "env": "test",
+  "environment": "test",
+  "healthy": true,
+  "instances": {
+    "11111111-aaaa-bbbb-cccc-000000000001": {
+      "deployment_name": "redis-small-11111111",
+      "instance_name": "fixture-redis",
+      "plan_id": "redis-plan",
+      "service_id": "redis",
+      "vm_count": 1,
+      "vm_healthy": 1,
+      "vm_last_updated": 1794643200,
+      "vm_status": "running"
+    }
+  },
+  "plans": {
+    "redis-plan": {
+      "description": "",
+      "id": "redis-plan",
+      "limit": 0,
+      "name": "standalone",
+      "releases": [
+        "redis-forge"
+      ],
+      "type": ""
+    }
+  },
+  "timestamp": 1794850001,
+  "vault": "connected",
+  "version": "fixture-1.8.4"
+}

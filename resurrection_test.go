@@ -38,7 +38,7 @@ func TestResurrectionResetDeletes(t *testing.T) {
 	if err := r.resurrection([]string{fixtureID}, "reset"); err != nil {
 		t.Fatal(err)
 	}
-	if len(only(b.requests(), "DELETE")) != 1 || !strings.Contains(out.String(), "config removed") {
+	if len(only(b.requests(), "DELETE")) != 1 || !strings.Contains(out.String(), "config deleted") {
 		t.Errorf("requests %+v output %s", b.requests(), out)
 	}
 }
@@ -74,7 +74,7 @@ func TestResurrectionReportsAFailureAndABadAction(t *testing.T) {
 	b.status("PUT /b/"+fixtureID+"/resurrection", 500, "resurrection_failed.json")
 	r, _, _ := testRunner(b.client(), "", true)
 
-	if err := r.resurrection([]string{fixtureID}, "on"); err == nil || !strings.Contains(err.Error(), "Failed to update resurrection config") {
+	if err := r.resurrection([]string{fixtureID}, "on"); err == nil || !strings.Contains(err.Error(), "director refused") {
 		t.Errorf("got %v", err)
 	}
 

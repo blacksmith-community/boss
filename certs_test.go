@@ -15,7 +15,7 @@ func TestCertListShowsSummaryAndFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, want := range []string{"2 certificates for 2 instances", "1 critical", "cert-aaaa-0001", "fixture-one.example.test", "17"} {
+	for _, want := range []string{"1 certificates for 1 instances", "1 warning", "c0ffee01", "fixture.redis.internal", "20", "Matching your filters: 1 certificates for 1 instances"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
@@ -28,6 +28,18 @@ func TestCertListShowsSummaryAndFilters(t *testing.T) {
 	}
 	if strings.Contains(path, "health") {
 		t.Errorf("a blank filter was sent: %s", path)
+	}
+}
+
+func TestCertListLeavesOutTheFilteredLineWithoutFilters(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/certificates/inventory": "cert_inventory.json"})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.certList(nil, CertFilter{}, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "Matching your filters") {
+		t.Errorf("output: %s", out)
 	}
 }
 
@@ -66,13 +78,13 @@ func TestCertListReportsABadFilter(t *testing.T) {
 }
 
 func TestCertShowPrintsTheCertificateButNotThePEM(t *testing.T) {
-	b := newBroker(t, map[string]string{"GET /b/certificates/items/cert-aaaa-0001": "cert_item.json"})
+	b := newBroker(t, map[string]string{"GET /b/certificates/items/c0ffee01": "cert_item.json"})
 	r, out, _ := testRunner(b.client(), "", true)
 
-	if err := r.certShow([]string{"cert-aaaa-0001"}); err != nil {
+	if err := r.certShow([]string{"c0ffee01"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Name:      fixture-one.example.test", "17 days left", "allowed=true modes=redeploy,patch", "expires within 30 days"} {
+	for _, want := range []string{"Name:      fixture.redis.internal", "20 days left", "allowed=true modes=redeploy", "Expiry:    warning"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
@@ -92,7 +104,7 @@ func TestCertInstanceResolvesAndPrints(t *testing.T) {
 	if err := r.certInstance([]string{fixtureID}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "Rotatable variables: redis_tls") {
+	if !strings.Contains(out.String(), "Rotatable variables: server_tls") {
 		t.Errorf("output: %s", out)
 	}
 }
@@ -119,7 +131,7 @@ func TestCertScanAsksThenScans(t *testing.T) {
 	if got := only(b.requests(), "POST")[0].Body; got != `{"instance_ids":["`+fixtureID+`"]}` {
 		t.Errorf("body: %s", got)
 	}
-	if !strings.Contains(out.String(), "Scan scan-aaaa-0001 is running.") {
+	if !strings.Contains(out.String(), "Scan scan-2 is running.") {
 		t.Errorf("output: %s", out)
 	}
 }
@@ -142,15 +154,15 @@ func TestCertPreviewSendsSelectionsAndChangesNothing(t *testing.T) {
 	b.status("POST /b/certificates/rotation/preview", 200, "cert_preview.json")
 	r, out, _ := testRunner(b.client(), "", false) // no --yes, and no question
 
-	if err := r.certPreview([]string{fixtureID}, []string{"redis_tls"}, "redeploy", "pending"); err != nil {
+	if err := r.certPreview([]string{fixtureID}, []string{"server_tls"}, "redeploy", "pending"); err != nil {
 		t.Fatal(err)
 	}
 
-	want := `{"mode":"redeploy","converge":"pending","selections":[{"instance_id":"` + fixtureID + `","variables":["redis_tls"]}]}`
+	want := `{"mode":"redeploy","converge":"pending","selections":[{"instance_id":"` + fixtureID + `","variables":["server_tls"]}]}`
 	if got := only(b.requests(), "POST")[0].Body; got != want {
 		t.Errorf("body: %s", got)
 	}
-	for _, w := range []string{"Preview preview-aaaa-0001", "Nothing was changed", "rotates redis_tls (17 days left)", "one VM is recreated", "Warning: fixture warning"} {
+	for _, w := range []string{"Preview fixture-preview-1", "Nothing was changed", "rotates server_tls (20 days left)", "restarts one VM", "Warning: fixture warning text"} {
 		if !strings.Contains(out.String(), w) {
 			t.Errorf("output lacks %q:\n%s", w, out)
 		}

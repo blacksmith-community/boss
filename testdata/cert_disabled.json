@@ -1,1 +1,5 @@
-{"success": false, "code": "inventory_disabled", "error": "The certificate inventory is turned off."}
+{
+  "code": "inventory_disabled",
+  "error": "Certificate inventory is off on this broker (certificates.inventory.enabled).",
+  "success": false
+}

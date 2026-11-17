@@ -73,7 +73,7 @@ func TestADeleteThatAnswers500IsSentOnce(t *testing.T) {
 		return reply{Status: 500, Body: `{"error":"boom"}`}
 	})
 
-	if err := retryClient(b).Delete(fixtureID); err == nil {
+	if err := retryClient(b).Delete(InstanceRef{ID: fixtureID}); err == nil {
 		t.Fatal("expected an error")
 	}
 	if n := count(b.requests(), "DELETE", "/v2/service_instances/"); n != 1 {

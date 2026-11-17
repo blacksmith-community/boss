@@ -1,1 +1,5 @@
-{"success": false, "code": "invalid_filter", "error": "\"nope\" is not a value of expiry"}
+{
+  "code": "invalid_filter",
+  "error": "\"soon\" is not a value of expiry; use one of expired, critical, warning, ok, unknown",
+  "success": false
+}

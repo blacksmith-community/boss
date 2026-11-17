@@ -1,1 +1,112 @@
-{"instance": {"id": "11111111-aaaa-bbbb-cccc-000000000001"}, "scan": {"state": "idle"}, "certificates": [{"id": "cert-aaaa-0001", "kind": "leaf", "common_name": "fixture-one.example.test", "expiry": "critical", "days_left": 17, "health": "ok", "owners": [{"kind": "instance", "instance_name": "fixture-one"}], "rotation": {"allowed": true}}], "rotatable_variables": ["redis_tls"], "summary": {"certificates": 1, "affected_instances": 1, "critical": 1, "needs_attention": 1}, "capabilities": {}}
+{
+  "instance": {
+    "id": "11111111-aaaa-bbbb-cccc-000000000001",
+    "name": "n"
+  },
+  "scan": {
+    "scanned_at": "2026-10-22T00:00:00Z",
+    "last_success_at": "0001-01-01T00:00:00Z",
+    "stale": false,
+    "error": "director timed out"
+  },
+  "certificates": [
+    {
+      "id": "c0ffee01",
+      "key": "/fixture/redis/server_tls",
+      "owners": [
+        {
+          "kind": "instance",
+          "instance_id": "11111111-aaaa-bbbb-cccc-000000000001",
+          "instance_name": "fixture-redis",
+          "deployment": "redis-small-11111111",
+          "service_name": "redis",
+          "plan_name": "small"
+        }
+      ],
+      "affected_instances": 1,
+      "variable": "server_tls",
+      "kind": "",
+      "common_name": "fixture.redis.internal",
+      "issuer": "fixture-ca",
+      "dns_names": [
+        "fixture.redis.internal"
+      ],
+      "key_algorithm": "RSA",
+      "key_bits": 2048,
+      "effective_not_after": "2026-12-04T08:00:00Z",
+      "days_left": 20,
+      "expiry": "warning",
+      "health": "ok",
+      "attention": true,
+      "observations": [
+        {
+          "source": "credhub",
+          "owner": {
+            "kind": "instance",
+            "instance_id": "11111111-aaaa-bbbb-cccc-000000000001",
+            "instance_name": "fixture-redis",
+            "deployment": "redis-small-11111111",
+            "service_name": "redis",
+            "plan_name": "small"
+          },
+          "locator": "/fixture/redis/server_tls",
+          "not_after": "2026-12-04T08:00:00Z",
+          "state": "ok",
+          "observed_at": "2026-11-14T08:00:00Z"
+        }
+      ],
+      "coverage": {
+        "expected_listeners": 0,
+        "observed_listeners": 0,
+        "failed_listeners": 0,
+        "complete": false,
+        "stale": false,
+        "oldest_observation": "0001-01-01T00:00:00Z",
+        "source_states": null
+      },
+      "rotation": {
+        "allowed": true,
+        "modes": [
+          "redeploy",
+          "patch"
+        ]
+      }
+    }
+  ],
+  "rotatable_variables": [
+    "server_tls"
+  ],
+  "summary": {
+    "certificates": 1,
+    "affected_instances": 1,
+    "expired": 0,
+    "critical": 0,
+    "warning": 1,
+    "expiry_ok": 0,
+    "expiry_unknown": 0,
+    "health_errors": 0,
+    "needs_attention": 1,
+    "unconverged": 0,
+    "reverted": 0,
+    "stale": 0,
+    "incomplete_coverage": 0
+  },
+  "capabilities": {
+    "credhub": {
+      "state": ""
+    },
+    "director": {
+      "version": "",
+      "force_latest_variables": false
+    },
+    "rotation": {
+      "enabled": false
+    },
+    "patch_in_place": {
+      "enabled": false
+    },
+    "probe": {
+      "enabled": false
+    }
+  }
+}

@@ -3,14 +3,24 @@
     {
       "id": "redis",
       "name": "redis",
-      "description": "A fixture Redis service",
+      "description": "fixture redis service",
+      "tags": [
+        "redis"
+      ],
       "bindable": true,
-      "tags": ["blacksmith", "dedicated"],
-      "plan_updateable": true,
       "plans": [
-        {"id": "redis-small", "name": "small", "description": "Small fixture plan"},
-        {"id": "redis-large", "name": "large", "description": "Large fixture plan"}
+        {
+          "id": "redis-small",
+          "name": "small",
+          "description": "fixture small plan"
+        },
+        {
+          "id": "redis-large",
+          "name": "large",
+          "description": "fixture large plan"
+        }
       ]
     }
   ]
 }
+

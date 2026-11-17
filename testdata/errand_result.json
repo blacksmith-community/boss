@@ -1,1 +1,11 @@
-{"deployment": "small-11111111-aaaa-bbbb-cccc-000000000001", "errand": "smoke-tests", "exit_code": 0, "stdout": "fixture stdout text\n", "stderr": "fixture stderr text\n", "instance": "standalone", "instance_id": "aaaaaaaa", "skipped": false, "results": [{"instance": "standalone", "instance_id": "aaaaaaaa", "exit_code": 0, "stdout": "fixture per-instance out\n", "stderr": ""}]}
+{
+  "deployment": "fixture-dep",
+  "errand": "smoke-tests",
+  "exit_code": 0,
+  "instance": "node",
+  "instance_id": "fixture-uuid-0",
+  "results": [],
+  "skipped": false,
+  "stderr": "",
+  "stdout": "all fixture checks passed"
+}

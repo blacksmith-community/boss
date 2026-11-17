@@ -1,5 +1,28 @@
 [
-  {"time": "2026-11-01T10:00:01Z", "stage": "Preparing deployment", "tags": [], "total": 1, "task": "Preparing deployment", "index": 1, "state": "started", "progress": 0, "data": {}},
-  {"time": "2026-11-01T10:00:03Z", "stage": "Preparing deployment", "tags": [], "total": 1, "task": "Preparing deployment", "index": 1, "state": "finished", "progress": 100, "data": {}},
-  {"time": "2026-11-01T10:00:04Z", "stage": "Creating missing vms", "tags": [], "total": 1, "task": "standalone/aaaaaaaa (0)", "index": 1, "state": "failed", "progress": 100, "data": {}, "error": {"code": 100, "message": "fixture failure"}}
+  {
+    "time": "2026-11-14T03:00:00-05:00",
+    "stage": "Updating instance",
+    "tags": [
+      "redis"
+    ],
+    "total": 1,
+    "task": "redis/0",
+    "index": 1,
+    "state": "started",
+    "progress": 0,
+    "data": null
+  },
+  {
+    "time": "2026-11-14T03:01:00-05:00",
+    "stage": "Updating instance",
+    "tags": [
+      "redis"
+    ],
+    "total": 1,
+    "task": "redis/0",
+    "index": 1,
+    "state": "finished",
+    "progress": 100,
+    "data": null
+  }
 ]

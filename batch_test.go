@@ -13,7 +13,7 @@ func TestBatchListPrintsJobs(t *testing.T) {
 	if err := r.batchList(nil); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"job-aaaa-0001", "fixture stemcell upgrade", "2/4", "job-aaaa-0002", "paused"} {
+	for _, want := range []string{"fixture-batch-0001", "fixture stemcell upgrade", "1/2", "fixture-batch-0002", "paused", "running", "upgrade"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
@@ -21,29 +21,29 @@ func TestBatchListPrintsJobs(t *testing.T) {
 }
 
 func TestBatchShowPrintsInstancesWithoutCommandText(t *testing.T) {
-	b := newBroker(t, map[string]string{"GET /b/upgrade/tasks/job-aaaa-0001": "batch_job.json"})
+	b := newBroker(t, map[string]string{"GET /b/upgrade/tasks/fixture-batch-0001": "batch_job.json"})
 	r, out, _ := testRunner(b.client(), "", true)
 
-	if err := r.batchShow([]string{"job-aaaa-0001"}); err != nil {
+	if err := r.batchShow([]string{"fixture-batch-0001"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Job:     job-aaaa-0001", "Status:  running", "fixture deploy failure", "4301", "stemcell ubuntu-noble 1.2.3, release redis 9.9.9"} {
+	for _, want := range []string{"Job:     fixture-batch-0001", "Kind:    upgrade", "Status:  completed", "fixture deploy failed", "Target:  stemcell ubuntu-noble 1.2"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out.String(), "fixture-command-text-never-printed") {
-		t.Error("command text was printed")
+	if strings.Contains(out.String(), " by \n") || strings.Contains(out.String(), " by  ") {
+		t.Errorf("an empty creator printed as %q", out)
 	}
 }
 
 func TestBatchActionsPostToTheirRoutes(t *testing.T) {
-	for action, file := range map[string]string{"pause": "batch_paused.json", "resume": "batch_resumed.json", "cancel": "batch_cancelled.json"} {
+	for action, file := range map[string]string{"pause": "batch_pause.json", "resume": "batch_paused_resume.json", "cancel": "batch_cancel.json"} {
 		b := newBroker(t, nil)
-		b.status("POST /b/upgrade/tasks/job-aaaa-0001/"+action, 200, file)
+		b.status("POST /b/upgrade/tasks/fixture-batch-0001/"+action, 200, file)
 		r, out, _ := testRunner(b.client(), "", true)
 
-		if err := r.batchAction([]string{"job-aaaa-0001"}, action); err != nil {
+		if err := r.batchAction([]string{"fixture-batch-0001"}, action); err != nil {
 			t.Fatalf("%s: %v", action, err)
 		}
 		if !strings.Contains(out.String(), "task ") {
@@ -57,26 +57,26 @@ func TestBatchActionsPostToTheirRoutes(t *testing.T) {
 
 func TestBatchActionsAskFirst(t *testing.T) {
 	b := newBroker(t, nil)
-	b.status("POST /b/upgrade/tasks/job-aaaa-0001/cancel", 200, "batch_cancelled.json")
+	b.status("POST /b/upgrade/tasks/fixture-batch-0001/cancel", 200, "batch_cancel.json")
 	r, _, errb := testRunner(b.client(), "\n", false)
 
-	if err := r.batchAction([]string{"job-aaaa-0001"}, "cancel"); !errors.Is(err, errAborted) {
+	if err := r.batchAction([]string{"fixture-batch-0001"}, "cancel"); !errors.Is(err, errAborted) {
 		t.Fatalf("got %v", err)
 	}
 	if len(b.requests()) != 0 {
 		t.Error("a request went out")
 	}
-	if !strings.Contains(errb.String(), "Cancel batch job job-aaaa-0001?") {
+	if !strings.Contains(errb.String(), "Cancel batch job fixture-batch-0001?") {
 		t.Errorf("prompt: %s", errb)
 	}
 }
 
 func TestBatchActionReportsAConflict(t *testing.T) {
 	b := newBroker(t, nil)
-	b.status("POST /b/upgrade/tasks/job-aaaa-0001/pause", 409, "batch_conflict.json")
+	b.status("POST /b/upgrade/tasks/fixture-batch-0001/pause", 409, "batch_cancel_done.json")
 	r, _, _ := testRunner(b.client(), "", true)
 
-	err := r.batchAction([]string{"job-aaaa-0001"}, "pause")
+	err := r.batchAction([]string{"fixture-batch-0001"}, "pause")
 	if err == nil || !strings.Contains(err.Error(), "invalid_task_state") {
 		t.Fatalf("got %v", err)
 	}
@@ -84,14 +84,14 @@ func TestBatchActionReportsAConflict(t *testing.T) {
 
 func TestBatchResumeSendsTheCommandKeyWithoutLoggingIt(t *testing.T) {
 	b := newBroker(t, nil)
-	b.status("POST /b/upgrade/tasks/job-aaaa-0001/resume", 200, "batch_resumed.json")
+	b.status("POST /b/upgrade/tasks/fixture-batch-0001/resume", 200, "batch_paused_resume.json")
 	c := b.client()
 	c.CommandKey = "fixture-command-key"
 	var logged strings.Builder
 	c.Debug, c.Trace, c.Stderr = true, true, &logged
 	r, _, _ := testRunner(c, "", true)
 
-	if err := r.batchAction([]string{"job-aaaa-0001"}, "resume"); err != nil {
+	if err := r.batchAction([]string{"fixture-batch-0001"}, "resume"); err != nil {
 		t.Fatal(err)
 	}
 	if got := b.requests()[0].CommandKey; got != "fixture-command-key" {
@@ -104,10 +104,10 @@ func TestBatchResumeSendsTheCommandKeyWithoutLoggingIt(t *testing.T) {
 
 func TestBatchResumeExplainsAMissingCommandKey(t *testing.T) {
 	b := newBroker(t, nil)
-	b.status("POST /b/upgrade/tasks/job-aaaa-0001/resume", 403, "batch_key_required.json")
+	b.status("POST /b/upgrade/tasks/fixture-batch-0001/resume", 401, "batch_credential_required.json")
 	r, _, _ := testRunner(b.client(), "", true)
 
-	err := r.batchAction([]string{"job-aaaa-0001"}, "resume")
+	err := r.batchAction([]string{"fixture-batch-0001"}, "resume")
 	if err == nil || !strings.Contains(err.Error(), "command key") {
 		t.Fatalf("got %v", err)
 	}

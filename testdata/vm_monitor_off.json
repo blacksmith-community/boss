@@ -1,1 +1,4 @@
-{"error": "VM monitor not configured", "running": false}
+{
+  "error": "VM monitor not configured",
+  "running": false
+}

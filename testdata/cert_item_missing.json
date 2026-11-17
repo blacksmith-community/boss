@@ -1,0 +1,5 @@
+{
+  "code": "instance_not_found",
+  "error": "No certificate has the ID nope.",
+  "success": false
+}

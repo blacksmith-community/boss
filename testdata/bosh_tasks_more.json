@@ -1,0 +1,30 @@
+{
+  "tasks": [
+    {
+      "id": 5103,
+      "state": "processing",
+      "description": "run errand smoke-tests from deployment fixture-dep",
+      "timestamp": 1793610600,
+      "started_at": "2026-11-02T09:10:00Z",
+      "user": "fixture-director-user",
+      "deployment": "fixture-dep",
+      "context_id": "fixture-context"
+    },
+    {
+      "id": 5102,
+      "state": "done",
+      "description": "create deployment 'fixture-dep'",
+      "timestamp": 1793610000,
+      "started_at": "2026-11-02T09:00:00Z",
+      "ended_at": "2026-11-02T09:01:35Z",
+      "result": "/deployments/fixture-dep",
+      "user": "fixture-director-user",
+      "deployment": "fixture-dep"
+    }
+  ],
+  "offset": 0,
+  "limit": 2,
+  "has_more": true,
+  "exact": true,
+  "ceiling": false
+}

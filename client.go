@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -278,8 +279,14 @@ func (c Client) statusIndex() (map[string]statusEntry, error) {
 	return out.Instances, nil
 }
 
-// Lookup finds an instance by exact ID or by an unambiguous prefix.
+// Lookup finds an instance by its exact ID or its exact name. It never
+// matches a prefix or a substring, because the commands that change an
+// instance act on whatever it returns.
 func (c Client) Lookup(want string) (InstanceRef, error) {
+	if strings.TrimSpace(want) == "" {
+		return InstanceRef{}, errors.New("an instance ID or name is required")
+	}
+
 	index, err := c.statusIndex()
 	if err != nil {
 		return InstanceRef{}, err
@@ -290,15 +297,13 @@ func (c Client) Lookup(want string) (InstanceRef, error) {
 			DeploymentName: e.DeploymentName, InstanceName: e.InstanceName}
 	}
 
-	// Exact match first
 	if e, ok := index[want]; ok {
 		return pick(want, e), nil
 	}
 
-	// Prefix match second
 	var matches []string
-	for id := range index {
-		if want != "" && strings.HasPrefix(id, want) {
+	for id, e := range index {
+		if e.InstanceName == want {
 			matches = append(matches, id)
 		}
 	}
@@ -306,16 +311,16 @@ func (c Client) Lookup(want string) (InstanceRef, error) {
 
 	switch len(matches) {
 	case 0:
-		return InstanceRef{}, fmt.Errorf("no instance found matching '%s'", want)
+		return InstanceRef{}, fmt.Errorf("no instance has the ID or name '%s'", want)
 	case 1:
 		return pick(matches[0], index[matches[0]]), nil
 	default:
-		return InstanceRef{}, fmt.Errorf("'%s' matches %d instances (%s); use more of the ID",
+		return InstanceRef{}, fmt.Errorf("'%s' matches %d instances (%s); use the ID",
 			want, len(matches), strings.Join(matches, ", "))
 	}
 }
 
-// Resolve turns an ID or a unique ID prefix into the full instance ID.
+// Resolve turns an instance ID or name into the instance ID.
 func (c Client) Resolve(want string) (string, error) {
 	ref, err := c.Lookup(want)
 	if err != nil {
@@ -480,13 +485,25 @@ func (c Client) Update(id, service, plan, previousPlan string, params map[string
 	return Instance{ID: id}, nil
 }
 
-// Delete removes a service instance with the specified ID.
-// This method supports asynchronous operations and will add the accepts_incomplete=true parameter.
-// Returns an error if the deletion fails, or nil if successful.
-func (c Client) Delete(id string) error {
-	_, err := c.request("DELETE", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", nil, nil)
+// ErrInstanceGone is what Delete returns when the broker answers 410,
+// which means it has no such instance.
+var ErrInstanceGone = errors.New("the broker answered 410: instance not found, or already deleted")
+
+// Delete removes a service instance. It sends the service and plan the
+// broker listed for the instance, adds accepts_incomplete=true, and never
+// sends the call again after a timeout.
+func (c Client) Delete(ref InstanceRef) error {
+	q := url.Values{}
+	q.Set("accepts_incomplete", "true")
+	q.Set("plan_id", ref.PlanID)
+	q.Set("service_id", ref.ServiceID)
+
+	status, err := c.long().request("DELETE", "/v2/service_instances/"+url.PathEscape(ref.ID)+"?"+q.Encode(), nil, nil)
 	if err != nil {
-		return fmt.Errorf("failed to delete instance %s: %w", id, err)
+		return fmt.Errorf("failed to delete instance %s: %w", ref.ID, err)
+	}
+	if status == 410 {
+		return fmt.Errorf("failed to delete instance %s: %w", ref.ID, ErrInstanceGone)
 	}
 	return nil
 }

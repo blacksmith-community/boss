@@ -1,0 +1,84 @@
+{
+  "bosh": "connected",
+  "commit": "0000000",
+  "env": "test",
+  "environment": "test",
+  "healthy": true,
+  "instances": {
+    "11111111-aaaa-bbbb-cccc-000000000001": {
+      "deployment_name": "redis-plan-11111111-aaaa-bbbb-cccc-000000000001",
+      "instance_name": "fixture-redis",
+      "organization_name": "fixture-org",
+      "plan_id": "redis-plan",
+      "service_id": "redis",
+      "space_name": "fixture-space",
+      "vm_count": 1,
+      "vm_healthy": 1,
+      "vm_ips": [
+        "10.0.0.5"
+      ],
+      "vm_last_updated": 1794643200,
+      "vm_status": "running"
+    },
+    "11111111-aaaa-bbbb-cccc-000000000002": {
+      "deployment_name": "redis-plan-11111111-aaaa-bbbb-cccc-000000000002",
+      "instance_name": "happy-turing",
+      "organization_name": "fixture-org",
+      "plan_id": "redis-plan",
+      "service_id": "redis",
+      "space_name": "fixture-space",
+      "vm_count": 1,
+      "vm_healthy": 1,
+      "vm_ips": [
+        "10.0.0.5"
+      ],
+      "vm_last_updated": 1794643200,
+      "vm_status": "running"
+    },
+    "11111111-aaaa-bbbb-cccc-000000000003": {
+      "deployment_name": "redis-plan-11111111-aaaa-bbbb-cccc-000000000003",
+      "instance_name": "shared-name",
+      "organization_name": "org-one",
+      "plan_id": "redis-plan",
+      "service_id": "redis",
+      "space_name": "fixture-space",
+      "vm_count": 1,
+      "vm_healthy": 1,
+      "vm_ips": [
+        "10.0.0.5"
+      ],
+      "vm_last_updated": 1794643200,
+      "vm_status": "running"
+    },
+    "11111111-aaaa-bbbb-cccc-000000000004": {
+      "deployment_name": "redis-plan-11111111-aaaa-bbbb-cccc-000000000004",
+      "instance_name": "shared-name",
+      "organization_name": "org-two",
+      "plan_id": "redis-plan",
+      "service_id": "redis",
+      "space_name": "fixture-space",
+      "vm_count": 1,
+      "vm_healthy": 1,
+      "vm_ips": [
+        "10.0.0.5"
+      ],
+      "vm_last_updated": 1794643200,
+      "vm_status": "running"
+    }
+  },
+  "plans": {
+    "redis-plan": {
+      "description": "",
+      "id": "redis-plan",
+      "limit": 0,
+      "name": "standalone",
+      "releases": [
+        "redis-forge"
+      ],
+      "type": ""
+    }
+  },
+  "timestamp": 1794850385,
+  "vault": "connected",
+  "version": "fixture-1.8.4"
+}

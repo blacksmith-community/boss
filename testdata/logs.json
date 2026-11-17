@@ -1,1 +1,8 @@
-{"logs": "line one of the fixture log\nline two of the fixture log", "total_lines": 2, "offset": 0, "limit": 100, "has_more": false, "error": null}
+{
+  "error": null,
+  "has_more": true,
+  "limit": 3,
+  "logs": "2026-11-14T08:04:00Z fixture log line 4\n2026-11-14T08:05:00Z fixture log line 5\n2026-11-14T08:06:00Z fixture log line 6",
+  "offset": 0,
+  "total_lines": 6
+}

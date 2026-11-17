@@ -1,0 +1,6 @@
+{
+  "deployment": "fixture-dep",
+  "operation": "restart",
+  "state": "queued",
+  "task_id": 5201
+}

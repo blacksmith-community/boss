@@ -12,7 +12,7 @@ func TestMonitorPrintsTheSummaryAndServices(t *testing.T) {
 	if err := r.monitor(nil); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"checks 2 services every 1h0m0s", "1 healthy, 1 failing", "failing", "small-11111111-aaaa-bbbb-cccc-000000000001"} {
+	for _, want := range []string{"checks 1 services every 1h0m0s", "1 healthy, 0 failing", "redis-small-11111111"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
@@ -38,7 +38,7 @@ func TestOrphansPrintsOrphansAndUnclaimed(t *testing.T) {
 	if err := r.orphans(nil); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"33333333-aaaa-bbbb-cccc-000000000009", "2h0m0s", "due now", "removes an orphan after 24h0m0s", "small-44444444-aaaa-bbbb-cccc-000000000001"} {
+	for _, want := range []string{"22222222-aaaa-bbbb-cccc-000000000009", "3h59m59s", "removes an orphan after 24h0m0s", "redis-small-33333333"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}

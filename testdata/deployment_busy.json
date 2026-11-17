@@ -1,1 +1,5 @@
-{"success": false, "code": "instance_busy", "error": "another action is running on this deployment"}
+{
+  "code": "instance_busy",
+  "error": "deployment fixture-dep is busy with restart from the UI",
+  "success": false
+}

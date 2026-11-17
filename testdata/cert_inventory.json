@@ -1,12 +1,130 @@
 {
-  "generated_at": "2026-11-03T08:00:00Z",
-  "summary": {"certificates": 2, "affected_instances": 2, "expired": 0, "critical": 1, "warning": 0, "expiry_ok": 1, "expiry_unknown": 0, "health_errors": 0, "needs_attention": 1, "unconverged": 0, "reverted": 0, "stale": 0, "incomplete_coverage": 0},
-  "filtered": {"certificates": 2},
-  "scan": {"state": "idle"},
-  "capabilities": {"rotation": true},
-  "settings": {},
+  "generated_at": "2026-11-14T08:00:00Z",
+  "summary": {
+    "certificates": 1,
+    "affected_instances": 1,
+    "expired": 0,
+    "critical": 0,
+    "warning": 1,
+    "expiry_ok": 0,
+    "expiry_unknown": 0,
+    "health_errors": 0,
+    "needs_attention": 1,
+    "unconverged": 0,
+    "reverted": 0,
+    "stale": 0,
+    "incomplete_coverage": 0
+  },
+  "filtered": {
+    "certificates": 1,
+    "affected_instances": 1,
+    "expired": 0,
+    "critical": 0,
+    "warning": 1,
+    "expiry_ok": 0,
+    "expiry_unknown": 0,
+    "health_errors": 0,
+    "needs_attention": 1,
+    "unconverged": 0,
+    "reverted": 0,
+    "stale": 0,
+    "incomplete_coverage": 0
+  },
+  "scan": {
+    "id": "scan-1",
+    "state": "idle",
+    "next_at": "2026-11-14T09:00:00Z",
+    "progress": {
+      "done": 0,
+      "total": 0
+    },
+    "errors": []
+  },
+  "capabilities": {
+    "credhub": {
+      "state": ""
+    },
+    "director": {
+      "version": "",
+      "force_latest_variables": false
+    },
+    "rotation": {
+      "enabled": false
+    },
+    "patch_in_place": {
+      "enabled": false
+    },
+    "probe": {
+      "enabled": false
+    }
+  },
+  "settings": {
+    "warning_days": 0,
+    "critical_days": 0,
+    "pause_on_failure": false
+  },
   "certificates": [
-    {"id": "cert-aaaa-0001", "key": "/fixture/small/redis_tls", "owners": [{"kind": "instance", "instance_id": "11111111-aaaa-bbbb-cccc-000000000001", "instance_name": "fixture-one", "deployment": "small-11111111-aaaa-bbbb-cccc-000000000001"}], "affected_instances": 1, "variable": "redis_tls", "kind": "leaf", "common_name": "fixture-one.example.test", "issuer": "Fixture CA", "dns_names": ["fixture-one.example.test"], "effective_not_after": "2026-11-20T00:00:00Z", "days_left": 17, "expiry": "critical", "health": "ok", "attention": true, "observations": [], "findings": [{"code": "expiring", "severity": "warning", "message": "expires within 30 days"}], "coverage": {}, "rotation": {"allowed": true, "modes": ["redeploy", "patch"]}},
-    {"id": "cert-aaaa-0002", "key": "/fixture/large/redis_tls", "owners": [{"kind": "instance", "instance_id": "11111111-aaaa-bbbb-cccc-000000000002", "instance_name": "fixture-two"}], "affected_instances": 1, "variable": "redis_tls", "kind": "leaf", "common_name": "fixture-two.example.test", "issuer": "Fixture CA", "effective_not_after": "2027-10-01T00:00:00Z", "days_left": 332, "expiry": "ok", "health": "ok", "attention": false, "observations": [], "coverage": {}, "rotation": {"allowed": false, "reasons": ["fixture reason"]}}
+    {
+      "id": "c0ffee01",
+      "key": "/fixture/redis/server_tls",
+      "owners": [
+        {
+          "kind": "instance",
+          "instance_id": "11111111-aaaa-bbbb-cccc-000000000001",
+          "instance_name": "fixture-redis",
+          "deployment": "redis-small-11111111",
+          "service_name": "redis",
+          "plan_name": "small"
+        }
+      ],
+      "affected_instances": 1,
+      "variable": "server_tls",
+      "kind": "",
+      "common_name": "fixture.redis.internal",
+      "issuer": "fixture-ca",
+      "dns_names": [
+        "fixture.redis.internal"
+      ],
+      "key_algorithm": "RSA",
+      "key_bits": 2048,
+      "effective_not_after": "2026-12-04T08:00:00Z",
+      "days_left": 20,
+      "expiry": "warning",
+      "health": "ok",
+      "attention": true,
+      "observations": [
+        {
+          "source": "credhub",
+          "owner": {
+            "kind": "instance",
+            "instance_id": "11111111-aaaa-bbbb-cccc-000000000001",
+            "instance_name": "fixture-redis",
+            "deployment": "redis-small-11111111",
+            "service_name": "redis",
+            "plan_name": "small"
+          },
+          "locator": "/fixture/redis/server_tls",
+          "not_after": "2026-12-04T08:00:00Z",
+          "state": "ok",
+          "observed_at": "2026-11-14T08:00:00Z"
+        }
+      ],
+      "coverage": {
+        "expected_listeners": 0,
+        "observed_listeners": 0,
+        "failed_listeners": 0,
+        "complete": false,
+        "stale": false,
+        "oldest_observation": "0001-01-01T00:00:00Z",
+        "source_states": null
+      },
+      "rotation": {
+        "allowed": true,
+        "modes": [
+          "redeploy",
+          "patch"
+        ]
+      }
+    }
   ]
 }

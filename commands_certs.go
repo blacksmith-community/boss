@@ -42,6 +42,16 @@ func (r *runner) certTable(certs []Certificate) {
 	r.table([]string{"ID", "Kind", "Name", "Expiry", "Days", "Health", "Owners"}, rows)
 }
 
+// hasCertFilter says whether any filter other than summary_only is set.
+func hasCertFilter(f CertFilter) bool {
+	for k, v := range f {
+		if v != "" && k != "summary_only" {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *runner) certSummary(s CertSummary) {
 	r.printf("%d certificates for %d instances: %d expired, %d critical, %d warning, %d ok, %d unknown; %d need attention.\n",
 		s.Certificates, s.AffectedInstances, s.Expired, s.Critical, s.Warning, s.ExpiryOK, s.ExpiryUnknown, s.NeedsAttention)
@@ -62,6 +72,10 @@ func (r *runner) certList(args []string, f CertFilter, summaryOnly bool) error {
 	}
 
 	r.certSummary(inv.Summary)
+	if hasCertFilter(f) {
+		r.printf("Matching your filters: ")
+		r.certSummary(inv.Filtered)
+	}
 	if len(inv.Certificates) > 0 {
 		r.printf("\n")
 		r.certTable(inv.Certificates)

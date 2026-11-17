@@ -1,0 +1,15 @@
+[
+  {
+    "time": "2026-11-14T03:00:00-05:00",
+    "stage": "Updating instance",
+    "tags": [
+      "redis"
+    ],
+    "total": 1,
+    "task": "redis/0",
+    "index": 1,
+    "state": "started",
+    "progress": 0,
+    "data": null
+  }
+]

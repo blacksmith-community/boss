@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const fixtureDeployment = "small-11111111-aaaa-bbbb-cccc-000000000001"
+const fixtureDeployment = "redis-small-11111111"
 
 func deployBroker(t *testing.T) *fakeBroker {
 	return newBroker(t, map[string]string{
@@ -18,7 +18,7 @@ func deployBroker(t *testing.T) *fakeBroker {
 func TestDeploymentOpsPostToTheirRoutes(t *testing.T) {
 	for _, op := range []string{"restart", "recreate", "stop", "start"} {
 		b := deployBroker(t)
-		b.status("POST /b/deployments/"+fixtureDeployment+"/"+op, 200, "deployment_action.json")
+		b.status("POST /b/deployments/"+fixtureDeployment+"/"+op, 200, "deployment_recreate.json")
 		r, out, _ := testRunner(b.client(), "", true)
 
 		if err := r.deploymentOp([]string{fixtureDeployment}, op); err != nil {
@@ -27,7 +27,7 @@ func TestDeploymentOpsPostToTheirRoutes(t *testing.T) {
 		if posts := only(b.requests(), "POST"); len(posts) != 1 || posts[0].Body != "" {
 			t.Errorf("%s posts: %+v", op, posts)
 		}
-		if !strings.Contains(out.String(), "BOSH task 4400") {
+		if !strings.Contains(out.String(), "BOSH task 5201") {
 			t.Errorf("%s output: %s", op, out)
 		}
 	}
@@ -35,7 +35,7 @@ func TestDeploymentOpsPostToTheirRoutes(t *testing.T) {
 
 func TestDeploymentOpAcceptsAnInstanceID(t *testing.T) {
 	b := deployBroker(t)
-	b.status("POST /b/deployments/"+fixtureDeployment+"/stop", 200, "deployment_action.json")
+	b.status("POST /b/deployments/"+fixtureDeployment+"/stop", 200, "deployment_recreate.json")
 	r, _, _ := testRunner(b.client(), "", true)
 
 	if err := r.deploymentOp([]string{fixtureID}, "stop"); err != nil {
@@ -49,7 +49,7 @@ func TestDeploymentOpAcceptsAnInstanceID(t *testing.T) {
 func TestDeploymentOpsAskFirst(t *testing.T) {
 	for _, op := range []string{"restart", "recreate", "stop", "start"} {
 		b := deployBroker(t)
-		b.status("POST /b/deployments/"+fixtureDeployment+"/"+op, 200, "deployment_action.json")
+		b.status("POST /b/deployments/"+fixtureDeployment+"/"+op, 200, "deployment_recreate.json")
 		r, _, errb := testRunner(b.client(), "n\n", false)
 
 		if err := r.deploymentOp([]string{fixtureDeployment}, op); !errors.Is(err, errAborted) {
@@ -85,7 +85,7 @@ func TestErrandsListsNames(t *testing.T) {
 	if err := r.errands([]string{fixtureDeployment}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "smoke-tests\nbackup\n") {
+	if !strings.Contains(out.String(), "smoke-tests\ncleanup\n") {
 		t.Errorf("output: %s", out)
 	}
 }
@@ -99,7 +99,7 @@ func TestErrandRunsAndShowsOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, want := range []string{"exited with 0", "fixture stdout text", "fixture stderr text", "fixture per-instance out"} {
+	for _, want := range []string{"exited with 0", "all fixture checks passed"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}

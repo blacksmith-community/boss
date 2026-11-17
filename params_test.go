@@ -12,8 +12,8 @@ func osbBroker(t *testing.T) *fakeBroker {
 		"GET /v2/catalog": "catalog.json",
 		"GET /b/status":   "status.json",
 	})
-	b.status("PUT /v2/service_instances/new-one", 202, "osb_empty.json")
-	b.status("PATCH /v2/service_instances/"+fixtureID, 202, "osb_empty.json")
+	b.status("PUT /v2/service_instances/new-one", 202, "osb_delete.json")
+	b.status("PATCH /v2/service_instances/"+fixtureID, 202, "osb_delete.json")
 	return b
 }
 
@@ -131,7 +131,7 @@ func TestUpdateChangesThePlan(t *testing.T) {
 		t.Errorf("body: %v", body)
 	}
 	prev := body["previous_values"].(map[string]interface{})
-	if prev["plan_id"] != "redis-small" || prev["service_id"] != "redis" {
+	if prev["plan_id"] != "redis-plan" || prev["service_id"] != "redis" {
 		t.Errorf("previous_values: %v", prev)
 	}
 }

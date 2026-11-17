@@ -1,1 +1,4 @@
-{"logs": "", "error": "unauthorized log file access"}
+{
+  "error": "unauthorized log file access",
+  "logs": ""
+}

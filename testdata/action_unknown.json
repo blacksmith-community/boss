@@ -1,0 +1,8 @@
+{
+  "success": false,
+  "code": "outcome_unknown",
+  "error": "The director's answer was lost or came too late, so the recreate of instance 7a1b may have started. Check the tasks of deployment redis-small-7a1b before you try again.",
+  "instance_id": "7a1b",
+  "deployment": "redis-small-7a1b",
+  "operation": "recreate"
+}

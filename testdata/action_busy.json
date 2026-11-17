@@ -1,0 +1,5 @@
+{
+  "code": "instance_busy",
+  "error": "instance 7a1b is busy with upgrade of 7a1b",
+  "success": false
+}

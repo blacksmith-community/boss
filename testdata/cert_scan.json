@@ -1,1 +1,4 @@
-{"scan_id": "scan-aaaa-0001", "state": "running"}
+{
+  "scan_id": "scan-2",
+  "state": "running"
+}

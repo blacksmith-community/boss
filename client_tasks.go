@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // BoshTask is one BOSH director task as /b/tasks reports it.
@@ -14,12 +16,14 @@ type BoshTask struct {
 	State       string `json:"state"`
 	Description string `json:"description"`
 	Timestamp   int64  `json:"timestamp"`
-	StartedAt   int64  `json:"started_at"`
-	EndedAt     int64  `json:"ended_at"`
-	Result      string `json:"result"`
-	User        string `json:"user"`
-	Deployment  string `json:"deployment"`
-	ContextID   string `json:"context_id"`
+	// StartedAt and EndedAt are RFC 3339 times. A task that has not
+	// started or has not ended leaves them out.
+	StartedAt  time.Time  `json:"started_at"`
+	EndedAt    *time.Time `json:"ended_at"`
+	Result     string     `json:"result"`
+	User       string     `json:"user"`
+	Deployment string     `json:"deployment"`
+	ContextID  string     `json:"context_id"`
 }
 
 // TaskFilter narrows a task listing.
@@ -30,10 +34,18 @@ type TaskFilter struct {
 	Offset int
 }
 
-// TaskList is a page of tasks.
+// TaskList is a page of tasks. A broker that predates paging answers a
+// bare array, and then every paging field keeps its zero value.
 type TaskList struct {
 	Tasks   []BoshTask `json:"tasks"`
+	Offset  int        `json:"offset"`
+	Limit   int        `json:"limit"`
 	HasMore bool       `json:"has_more"`
+	// Exact is false when the broker stopped counting before it could tell
+	// whether more tasks follow. Ceiling is true when the page ends at the
+	// deepest task the listing reaches.
+	Exact   bool `json:"exact"`
+	Ceiling bool `json:"ceiling"`
 }
 
 // Tasks lists BOSH tasks with GET /b/tasks. It asks for the paged shape,
@@ -54,9 +66,27 @@ func (c Client) Tasks(f TaskFilter) (TaskList, error) {
 		q.Set("offset", strconv.Itoa(f.Offset))
 	}
 
+	_, body, err := c.rawRequest("GET", "/b/tasks?"+q.Encode(), nil)
+	if err != nil {
+		return TaskList{}, fmt.Errorf("failed to list tasks: %w", err)
+	}
+	return decodeTaskList(body)
+}
+
+// decodeTaskList reads either shape of /b/tasks. The paged shape is an
+// object, and the plain shape, which a broker older than paging sends
+// whatever the request says, is a bare array.
+func decodeTaskList(body []byte) (TaskList, error) {
 	var out TaskList
-	if _, err := c.request("GET", "/b/tasks?"+q.Encode(), nil, &out); err != nil {
-		return out, fmt.Errorf("failed to list tasks: %w", err)
+	trimmed := bytes.TrimSpace(body)
+	if bytes.HasPrefix(trimmed, []byte("[")) {
+		if err := json.Unmarshal(trimmed, &out.Tasks); err != nil {
+			return out, fmt.Errorf("failed to parse task list: %w", err)
+		}
+		return out, nil
+	}
+	if err := json.Unmarshal(trimmed, &out); err != nil {
+		return out, fmt.Errorf("failed to parse task list: %w", err)
 	}
 	return out, nil
 }
@@ -118,7 +148,13 @@ func decodeTaskOutput(b []byte) (string, error) {
 
 	var sb strings.Builder
 	for _, e := range events {
-		sb.Write(e)
+		// One event per line, whatever whitespace the broker used.
+		var line bytes.Buffer
+		if err := json.Compact(&line, e); err != nil {
+			line.Reset()
+			line.Write(e)
+		}
+		sb.Write(line.Bytes())
 		sb.WriteByte('\n')
 	}
 	return sb.String(), nil
