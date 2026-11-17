@@ -72,6 +72,8 @@ func (r *runner) tasksList(args []string, f TaskFilter) error {
 	switch {
 	case list.HasMore && list.Ceiling:
 		r.printf("\nThe broker lists no deeper than this, so older tasks are out of reach. Narrow the list with --state or --type.\n")
+	case list.HasMore && !list.Exact:
+		r.printf("\nThe broker stopped counting, so more tasks may follow; raise --offset to look further.\n")
 	case list.HasMore:
 		r.printf("\nMore tasks follow; raise --offset to see them.\n")
 	}

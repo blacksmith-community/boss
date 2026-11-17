@@ -179,3 +179,22 @@ func TestTasksListShowsWhyATaskFailed(t *testing.T) {
 		t.Errorf("a finished task has no failure:\n%s", got)
 	}
 }
+
+func TestTasksListSaysWhenTheBrokerStoppedCounting(t *testing.T) {
+	// The recorded answer has exact true. The broker sends exact false
+	// when it stops before it can tell, which only changes that one value.
+	body := strings.Replace(fixture(t, "bosh_tasks_more.json"), `"exact": true`, `"exact": false`, 1)
+	if body == fixture(t, "bosh_tasks_more.json") {
+		t.Fatal("the fixture has no exact flag to change")
+	}
+	b := newBroker(t, nil)
+	b.route("GET /b/tasks", func(int) reply { return reply{Status: 200, Body: body} })
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.tasksList(nil, TaskFilter{Limit: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "stopped counting") || strings.Contains(out.String(), "More tasks follow;") {
+		t.Errorf("output: %s", out)
+	}
+}
