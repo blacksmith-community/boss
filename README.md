@@ -18,11 +18,18 @@ Boss needs the broker's URL and its basic-auth credentials. Each setting has a f
 | `--org` | `BLACKSMITH_ORG` | Organization sent by `create`, which defaults to `boss` |
 | `--space` | `BLACKSMITH_SPACE` | Space sent by `create`, which defaults to `boss` |
 | `--command-key` | `BLACKSMITH_COMMAND_KEY` | Second credential for batch command jobs |
+| `--command-key-file` | `BLACKSMITH_COMMAND_KEY_FILE` | File whose first line holds the command key |
+| `--timeout` | `BOSS_TIMEOUT` | How long one request may take, such as `90s` or `5m` |
+| `--deployment` | none | A director deployment named outright, for the deployment commands |
 | `-y`, `--yes` | none | Skip the confirmation questions |
+
+A command key given on the command line stays in the shell history and shows in the process list, so we prefer the environment variable or the key file. Boss sends the key only on the batch command routes, and never writes it to a log.
+
+Boss gives a read 30 seconds. It gives a call that waits on BOSH, which means an errand, a restart, a recreate, a stop, a start, or a delete, 15 minutes. The `--timeout` flag or `BOSS_TIMEOUT` sets one limit for every call, as a duration such as `90s` or `5m`, or as a number of seconds. When a call that changes something times out, Boss says the outcome is unknown and points us to `boss tasks list`, because the broker may have started the work.
 
 ## Commands
 
-Every command accepts `-h` for its own help. Where a command takes an instance, we can give the full ID or any prefix that matches exactly one instance.
+Every command accepts `-h` for its own help. Where a command takes an instance, we give its full ID or its exact name. Boss never matches a prefix or part of a name. A name that no instance has, a name that two instances share, an empty argument, or a failed lookup stops the command before it sends anything.
 
 | Command | What it does |
 |---------|--------------|
@@ -49,19 +56,19 @@ Every command accepts `-h` for its own help. Where a command takes an instance, 
 | `boss certificates instance INSTANCE` | Shows the certificates of one instance |
 | `boss certificates scan` | Starts a certificate scan, of one or more instances with `--instance` |
 | `boss certificates preview INSTANCE` | Shows what a rotation would do, using `--variable` and `--mode`, and changes nothing |
-| `boss deployment restart NAME` | Restarts the jobs on every VM of a deployment |
-| `boss deployment recreate NAME` | Recreates every VM of a deployment |
-| `boss deployment stop NAME` | Stops every VM of a deployment |
-| `boss deployment start NAME` | Starts the VMs of a deployment again |
-| `boss deployment errands NAME` | Lists the errands of a deployment |
-| `boss deployment errand NAME ERRAND` | Runs an errand, on chosen instances with `--instance` |
+| `boss deployment restart INSTANCE` | Restarts the jobs on every VM of a deployment |
+| `boss deployment recreate INSTANCE` | Recreates every VM of a deployment |
+| `boss deployment stop INSTANCE` | Stops every VM of a deployment |
+| `boss deployment start INSTANCE` | Starts the VMs of a deployment again |
+| `boss deployment errands INSTANCE` | Lists the errands of a deployment |
+| `boss deployment errand INSTANCE ERRAND` | Runs an errand, on chosen instances with `--instance` |
 | `boss resurrection on INSTANCE` | Turns BOSH resurrection on |
 | `boss resurrection off INSTANCE` | Turns BOSH resurrection off |
 | `boss resurrection reset INSTANCE` | Removes the setting, so the director's default applies |
 | `boss monitor` | Prints the VM monitor summary |
 | `boss orphans` | Lists orphaned instances and unclaimed deployments |
 
-The deployment commands take a deployment name, or an instance ID, and the resurrection commands also accept `blacksmith` for the broker's own deployment.
+The deployment commands act on the deployment of the instance we name. The broker does not check who owns a deployment on these routes, so Boss never takes a bare deployment name as an argument. To act on a director deployment that no instance owns, we leave the instance out and pass `--deployment NAME`, and the confirmation question names that deployment. The resurrection commands also accept `blacksmith` for the broker's own deployment.
 
 The word `redeploy` covers two different actions. By default it recreates every VM of the instance, which calls the broker's `recreate` route. With `--restart` it restarts the jobs and leaves the VMs alone, which calls the `restart` route. The help text for `boss redeploy -h` says the same.
 
@@ -76,7 +83,7 @@ boss update relaxed-tesla -c params.yml
 boss update relaxed-tesla --plan large
 ```
 
-Both `create` and `update` ask for confirmation before they send anything. The plan option names a plan of the instance's own service, and Boss sends the old plan as the OSB `previous_values` so the broker can tell what changed.
+Both `create` and `update` ask for confirmation before they send anything. The plan option names a plan of the instance's own service, and Boss sends the old plan as the OSB `previous_values` so the broker can tell what changed. Boss refuses a plan change when the catalog does not mark the service `plan_updateable`, and when the instance already has the plan we name.
 
 ## Safety
 
@@ -84,25 +91,38 @@ Every command that changes something asks first. That covers create, update, del
 
 Boss prints credentials only when we run `boss creds`. Debug and trace output hide the `Authorization` header, the command key, the parameters of create and update, and the bodies of credentials, manifests, BOSH task output, batch job detail, and errand results. Boss never writes credentials to a log file.
 
-When the broker refuses a deployment action because another task holds the deployment, or because the outcome is unknown, Boss reports the refusal and does not send the request again.
+Boss repeats a request after a server error or a dropped connection only when the request reads, which means a GET or a HEAD. A request that changes something is never sent a second time, with one exception. When the connection is refused before anything reaches the broker, any request may go again. When the broker refuses a deployment action because another task holds the deployment, or because the outcome is unknown, Boss reports the refusal and does not send the request again.
+
+A delete resolves the instance first and sends its service and plan. When the broker answers that the instance is gone, Boss says it was not found and exits with an error, because we cannot tell a deleted instance from a mistyped one. An errand that ran and exited with a non-zero code prints its output and the code, and then exits with an error.
 
 ## What the broker must provide
 
 Boss talks to the Blacksmith broker and expects the Open Service Broker API at version 2.16 or later for `create`, `update`, `delete`, and `catalog`.
 
-The other commands follow the broker's own `/b/` routes. We wrote and tested them against the Blacksmith development line that follows release v1.8.2. The `redeploy` and `orphans` commands need a broker newer than v1.8.2, because v1.8.2 does not serve the per-instance restart and recreate routes or the orphan report. The other commands call routes that v1.8.2 also serves, but we checked response shapes only against the newer line.
+The other commands follow the broker's own `/b/` routes, and the table shows how each one behaves against the older v1.8.2 broker and against the development line that follows it.
+
+| Command | v1.8.2 | Newer line |
+|---------|--------|------------|
+| `tasks`, `monitor`, and the `deployment` commands | Works, and we checked the response shapes. The task list is a bare array with no paging hints. | Works, with paging hints |
+| `batch`, `certificates`, and `resurrection` | The routes exist, but we checked response shapes only against the newer line | Works |
+| `redeploy` | Falls back to the deployment recreate and restart routes, using the deployment name from the broker's index | Uses the per-instance routes |
+| `orphans` | Not served, so Boss says the broker is too old | Works |
+
+When a broker answers a route with the plain-text 404 `endpoint not found`, Boss names the command and says the broker is too old for it. An ordinary JSON not-found answer, such as an unknown instance, is reported as it is.
 
 The certificate commands need the certificate inventory switched on in the broker. When it is off, the broker answers with an `inventory_disabled` refusal and Boss prints it.
 
 ## Limits worth knowing
 
-- The broker does not implement the OSB update call yet, so `boss update --plan` is sent correctly and the broker refuses it. Updating parameters runs into the same limit.
+- The broker does not implement the OSB update call yet, so it answers every update with a 500 that says `not implemented`. Boss turns that into the message that the broker does not support updates yet, and it sends the update only once.
 
-- When the broker has no credentials stored for an instance, it answers with placeholder values in place of an error. Check that the values from `boss creds` look real before using them.
+- Brokers that hold no credentials for an instance used to answer with placeholder values in place of an error. Boss recognizes that placeholder set, refuses to print it, and exits with an error.
 
 - The broker's `POST /b/cleanup` route answers that it is not implemented, so Boss never calls it. The `boss orphans` command only reads the report. It cannot remove anything.
 
-- Batch command jobs ask for a second credential. Give it with `--command-key` or `BLACKSMITH_COMMAND_KEY` before we run `boss batch show` or `boss batch resume` on one.
+- Batch command jobs ask for a second credential. Give it with `BLACKSMITH_COMMAND_KEY` or `--command-key-file` before we run `boss batch show` or `boss batch resume` on one.
+
+- Following a task with `-f` stops with an error when a step fails, and it stops quietly once every step has finished and nothing new arrives.
 
 ## Not yet supported
 
@@ -197,6 +217,6 @@ boss --trace catalog
 
 6. Profit!
 
-Boss tests run against recorded broker responses served by `httptest`, kept under `testdata/`. Run `make test` before sending a change.
+Boss tests run against responses that the broker's own handlers produced, served by `httptest` and kept under `testdata/`. The README in that folder says how we made each file and which broker version it came from. Run `make test` before sending a change.
 
 [bs]: https://github.com/blacksmith-community/blacksmith

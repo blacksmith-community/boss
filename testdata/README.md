@@ -10,7 +10,9 @@ Identifiers are fixed so the tests can name them. Instance IDs look like `111111
 
 The fixtures cover shapes and status codes. They do not cover timing, because the handlers ran against a scripted director that answers at once. They also cannot show how the broker behaves under load or across a restart.
 
-Two files are slices of a real response. The file `task_log_first.json` holds the first event of `task_log.json`, and the follow test uses it to stand for the answer a task gives early in its run.
+One file is a slice of a real response. The file `task_log_first.json` holds the first event of `task_log.json`, and the follow test uses it to stand for the answer a task gives early in its run.
+
+A few tests change a recorded response in memory and say so where they do. One adds `plan_updateable` to the catalog, because the broker never sets it, and others mark a step of the task log as failed or move its times to a later day.
 
 The file `params.json` and its twin `params.yml` are inputs that we hand to Boss, so they are not broker responses.
 
