@@ -25,7 +25,7 @@ Boss needs the broker's URL and its basic-auth credentials. Each setting has a f
 
 A command key given on the command line stays in the shell history and shows in the process list, so we prefer the environment variable or the key file. Boss sends the key only on the batch command routes, and never writes it to a log.
 
-Boss gives a read 30 seconds. It gives a call that waits on BOSH, which means an errand, a restart, a recreate, a stop, a start, or a delete, 15 minutes. The `--timeout` flag or `BOSS_TIMEOUT` sets one limit for every call, as a duration such as `90s` or `5m`, or as a number of seconds. When a call that changes something times out, is cancelled with Ctrl-C, or loses its connection after it was sent, Boss says the outcome is unknown and points us to `boss tasks list`, because the broker may have started the work. When the connection fails before anything is sent, Boss says that nothing was sent, so running the command again is safe.
+Boss gives a read 30 seconds. It gives a call that waits on BOSH, which means an errand, a restart, a recreate, a stop, a start, or a delete, 15 minutes. The `--timeout` flag or `BOSS_TIMEOUT` sets one limit for every call, as a duration such as `90s` or `5m`, or as a number of seconds. When a call that changes something times out, is cancelled with Ctrl-C, or gets no complete answer after it was sent, which includes a lost connection, a cut-short body, and a garbled reply, Boss says the outcome is unknown and points us to `boss tasks list`, because the broker may have started the work. When the connection fails before anything is sent, Boss says that nothing was sent, so running the command again is safe.
 
 ## Commands
 

@@ -127,7 +127,8 @@ func (s *scripted) RoundTrip(req *http.Request) (*http.Response, error) {
 func TestTheAttemptCountIsTheNumberOfRequestsMade(t *testing.T) {
 	// The first attempt cannot connect, so it is tried again. The second
 	// connects and then fails in a way that is not retried, so the error
-	// must say 2 attempts even though the limit allows 6.
+	// must say 2 attempts even though the limit allows 6. A read is used
+	// because a write that connected reports an unknown outcome instead.
 	s := &scripted{
 		steps: []error{&net.OpError{Op: "dial", Err: errors.New("refused")}, errors.New("tls: bad certificate")},
 		sent:  []bool{false, true},
@@ -135,7 +136,7 @@ func TestTheAttemptCountIsTheNumberOfRequestsMade(t *testing.T) {
 	var debug strings.Builder
 	c := &Client{URL: "http://broker.invalid", MaxRetries: 5, Backoff: time.Millisecond, RoundTripper: s, Debug: true, Stderr: &debug}
 
-	_, err := c.Redeploy(fixtureID, false)
+	_, err := c.Catalog()
 	if err == nil || !strings.Contains(err.Error(), "after 2 attempts") {
 		t.Fatalf("want 2 attempts, got %v", err)
 	}

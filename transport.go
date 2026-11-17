@@ -17,7 +17,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 )
 
@@ -83,11 +82,7 @@ type UnknownOutcomeError struct {
 }
 
 func (e UnknownOutcomeError) Error() string {
-	how := "ended before the broker answered"
-	if timedOut(e.Cause) {
-		how = "timed out"
-	}
-	return fmt.Sprintf("the %s request %s after it was sent, so its outcome is unknown and the action may still be running; check boss tasks list before running it again", e.Method, how)
+	return fmt.Sprintf("The %s request was sent but no complete answer came back, so its outcome is unknown and the action may still be running, and we suggest running boss tasks list before running it again.", e.Method)
 }
 
 // NotSentError marks a failure that happened before any connection to the
@@ -100,26 +95,7 @@ func (e NotSentError) Error() string {
 
 func (e NotSentError) Unwrap() error { return e.Cause }
 
-// cutOff says whether err means a request that was sent never got its
-// answer, because the connection ended, was reset, timed out, or was
-// cancelled.
-func cutOff(err error) bool {
-	return timedOut(err) ||
-		errors.Is(err, io.EOF) ||
-		errors.Is(err, io.ErrUnexpectedEOF) ||
-		errors.Is(err, syscall.ECONNRESET) ||
-		errors.Is(err, syscall.EPIPE) ||
-		errors.Is(err, context.Canceled) ||
-		errors.Is(err, context.DeadlineExceeded)
-}
-
 func (e UnknownOutcomeError) Unwrap() error { return e.Cause }
-
-// timedOut says whether err is a client side timeout.
-func timedOut(err error) bool {
-	var ne net.Error
-	return errors.As(err, &ne) && ne.Timeout()
-}
 
 // transports holds the one Transport each TLS setting needs. Every
 // request of the process shares them, so a long follow reuses its
@@ -377,7 +353,7 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 	if in != nil {
 		b, err := json.Marshal(in)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request: %w", err)
+			return nil, NotSentError{Cause: fmt.Errorf("failed to marshal request: %w", err)}
 		}
 
 		body = bytes.NewBuffer(b)
@@ -391,12 +367,12 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 
 	target, err := c.buildURL(path)
 	if err != nil {
-		return nil, err
+		return nil, NotSentError{Cause: err}
 	}
 
 	req, err := http.NewRequestWithContext(c.context(), method, target, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, NotSentError{Cause: fmt.Errorf("failed to create request: %w", err)}
 	}
 
 	// Set API version header for v2 endpoints
@@ -448,13 +424,26 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 	return res, nil
 }
 
+// sentWithoutAnswer says whether a request that changes things may have
+// reached the broker and then got no usable answer. Anything that fails
+// after a connection exists counts, whatever the cause, because the broker
+// may have acted. A failure before a connection, and a refused redirect
+// that came from an answer, do not.
+func sentWithoutAnswer(method string, err error) bool {
+	if idempotent(method) {
+		return false
+	}
+	var ns NotSentError
+	var redirect RedirectError
+	return !errors.As(err, &ns) && !errors.As(err, &redirect)
+}
+
 // rawRequest sends the request and returns the status and the body, with
 // an APIError for any answer of 400 or higher.
 func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, error) {
 	res, err := c.do(method, path, in)
 	if err != nil {
-		var ns NotSentError
-		if !idempotent(method) && !errors.As(err, &ns) && cutOff(err) {
+		if sentWithoutAnswer(method, err) {
 			return 0, nil, UnknownOutcomeError{Method: method, Cause: err}
 		}
 		return 0, nil, fmt.Errorf("request failed: %w", err)
@@ -464,6 +453,9 @@ func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, er
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
+		if !idempotent(method) {
+			return res.StatusCode, nil, UnknownOutcomeError{Method: method, Cause: err}
+		}
 		return res.StatusCode, nil, fmt.Errorf("failed to read response: %w", err)
 	}
 

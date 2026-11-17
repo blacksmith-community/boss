@@ -127,3 +127,63 @@ func TestAWriteThatTimesOutAtDialSaysNothingWasSent(t *testing.T) {
 		t.Errorf("a dial that never completed has no unknown outcome: %v", err)
 	}
 }
+
+// rawServer answers each connection by reading the request head and body
+// and then writing exactly what answer says.
+func rawServer(t *testing.T, answer func(net.Conn)) string {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer conn.Close()
+				buf := make([]byte, 4096)
+				_, _ = conn.Read(buf)
+				answer(conn)
+			}()
+		}
+	}()
+	return "http://" + ln.Addr().String()
+}
+
+func TestAWriteWhoseAnswerIsCutShortOrGarbledIsUnknown(t *testing.T) {
+	cases := map[string]func(net.Conn){
+		"truncated body": func(c net.Conn) {
+			_, _ = c.Write([]byte("HTTP/1.1 202 Accepted\r\nContent-Type: application/json\r\nContent-Length: 500\r\n\r\n{\"task_id\":"))
+		},
+		"garbled status": func(c net.Conn) {
+			_, _ = c.Write([]byte("this is not http\r\n\r\n"))
+		},
+		"stalled body": func(c net.Conn) {
+			_, _ = c.Write([]byte("HTTP/1.1 202 Accepted\r\nContent-Length: 500\r\n\r\n{"))
+			time.Sleep(2 * time.Second)
+		},
+	}
+	for name, answer := range cases {
+		url := rawServer(t, answer)
+		c := &Client{URL: url, MaxRetries: -1, Timeout: 500 * time.Millisecond}
+
+		_, err := c.Redeploy(fixtureID, false)
+		assertUnknown(t, name, err)
+	}
+}
+
+func TestAReadWhoseAnswerIsCutShortIsNotCalledUnknown(t *testing.T) {
+	url := rawServer(t, func(c net.Conn) {
+		_, _ = c.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 500\r\n\r\n{"))
+	})
+	c := &Client{URL: url, MaxRetries: -1}
+
+	if _, err := c.Catalog(); err == nil || strings.Contains(err.Error(), "outcome is unknown") {
+		t.Errorf("a read has no unknown outcome: %v", err)
+	}
+}
