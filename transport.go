@@ -681,15 +681,28 @@ func shownReason(s string) string {
 	return shown
 }
 
-// machineCode matches a snake_case identifier, such as credentials_error,
-// which is a machine error code and holds no secret.
-var machineCode = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+// brokerErrorCodes are the short codes the broker puts in the error field
+// of an Open Service Broker answer. They are taken from the osbapi package
+// that the broker vendors, in github.com/fivetwenty-io/osbapi/v2/pkg/osbapi,
+// so a change there means a change here. HTTPError is Boss's own code for an
+// answer that was not JSON.
+var brokerErrorCodes = map[string]bool{
+	"AsyncRequired":           true,
+	"ConcurrencyError":        true,
+	"MaintenanceInfoConflict": true,
+	"RequiresApp":             true,
+	"HTTPError":               true,
+}
 
-// machineOrReason shows a machine error code in full and treats any other
-// text in the error field as a reason.
+// machineOrReason shows a known error code in full. Any other text in the
+// error field is a reason, and a single word with no spaces in it, which
+// could be a secret on its own, is withheld.
 func machineOrReason(s string) string {
-	if machineCode.MatchString(s) {
+	if brokerErrorCodes[s] {
 		return s
+	}
+	if len(strings.Fields(s)) == 1 {
+		return reasonWithheld
 	}
 	return shownReason(s)
 }

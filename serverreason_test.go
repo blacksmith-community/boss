@@ -104,11 +104,12 @@ func TestTheAPIErrorCodeIsCheckedLikeTheDescription(t *testing.T) {
 	}
 }
 
-func TestAMachineCodeAndTheBrokersFixedMessagesPrintInFull(t *testing.T) {
+func TestABrokerErrorCodeAndTheBrokersFixedMessagesPrintInFull(t *testing.T) {
 	for _, code := range []string{
-		"credentials_error",
-		"batch_credential_required",
-		"deployment_not_managed",
+		"AsyncRequired",
+		"ConcurrencyError",
+		"MaintenanceInfoConflict",
+		"RequiresApp",
 		"credentials are not available because Vault is not configured",
 		"credentials are not available because Vault did not answer",
 		"credentials are not available because nothing is stored for this instance",
@@ -119,7 +120,11 @@ func TestAMachineCodeAndTheBrokersFixedMessagesPrintInFull(t *testing.T) {
 			t.Errorf("got %q, want %q", got, code)
 		}
 	}
-	for _, code := range []string{"Token_error", "token_" + strings.Repeat("x", 64), "token_error "} {
+	for _, code := range []string{
+		"Token_error", "token_" + strings.Repeat("x", 64), "token_error ",
+		"hunter2", "0123456789abcdef0123456789abcdef", "db_password_hunter2", "sk_" + "live_" + "4eC39HqLyjWDarjtT1zdp7dc",
+		"asyncrequired", "AsyncRequired2",
+	} {
 		if got := (APIError{Code: code}).Error(); got != reasonWithheld {
 			t.Errorf("%q printed as %q", code, got)
 		}
