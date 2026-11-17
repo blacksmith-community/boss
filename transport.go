@@ -702,10 +702,6 @@ func machineOrReason(s string) string {
 var fixedBrokerReasons = map[string]bool{
 	// internal/handlers/blacksmith/handler.go
 	"unauthorized log file access": true,
-	// internal/handlers/blacksmith/handler.go
-	"vault_max_versions must be between 0 and 1000 (0 = unlimited)": true,
-	// internal/handlers/services/redis/handler.go
-	"credentials not found": true,
 	// internal/handlers/services/handler.go
 	"credentials are not available because Vault is not configured":             true,
 	"credentials are not available because Vault did not answer":                true,
@@ -716,6 +712,12 @@ var fixedBrokerReasons = map[string]bool{
 	"CredHub refused the broker's credentials.": true,
 }
 
+// weakKeyFinding is the broker's weak key finding, whose algorithm and bit
+// count change. The algorithm comes from a fixed set, the bit count is
+// digits only, and every other character is literal. The format is the one
+// in internal/certinventory/parse.go in the broker.
+var weakKeyFinding = regexp.MustCompile(`^The (RSA|ECDSA) key is only [0-9]{1,5} bits long, which is below today's minimum\.$`)
+
 // reasonText cleans the broker's reason for display. It fails closed.
 // Control and format characters become spaces first, and then a reason
 // that might hold a secret is withheld entirely, because no pattern can
@@ -725,8 +727,8 @@ var fixedBrokerReasons = map[string]bool{
 // is on one line and cut at 512 runes.
 // A reason that is one of the fixed broker reasons is shown as it is.
 func reasonText(s string) (string, bool) {
-	if fixedBrokerReasons[strings.TrimSpace(s)] {
-		return strings.TrimSpace(s), false
+	if trimmed := strings.TrimSpace(s); fixedBrokerReasons[trimmed] || weakKeyFinding.MatchString(trimmed) {
+		return trimmed, false
 	}
 	spaced := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {

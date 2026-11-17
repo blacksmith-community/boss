@@ -148,9 +148,8 @@ func TestScrubURLDropsPathParameters(t *testing.T) {
 func TestAFixedBrokerReasonIsShownOnlyWhenItMatchesExactly(t *testing.T) {
 	for _, in := range []string{
 		"unauthorized log file access",
-		"credentials not found",
-		"vault_max_versions must be between 0 and 1000 (0 = unlimited)",
-		"  credentials not found\n",
+		"CredHub refused the broker's credentials.",
+		"  CredHub refused the broker's credentials.\n",
 	} {
 		if shown, withheld := reasonText(in); withheld || shown != strings.TrimSpace(in) {
 			t.Errorf("%q: got %q (withheld %v)", in, shown, withheld)
@@ -160,9 +159,33 @@ func TestAFixedBrokerReasonIsShownOnlyWhenItMatchesExactly(t *testing.T) {
 		"an extra word":     "unauthorized log file access now",
 		"a leading word":    "the unauthorized log file access",
 		"another case":      "Unauthorized log file access",
-		"an extra marker":   "credentials not found=1",
+		"an extra marker":   "CredHub refused the broker's credentials.=1",
 		"a split character": "credentials not\u200b found",
-		"a prefix":          "credentials not",
+		"a prefix":          "CredHub refused the broker's credential",
+	} {
+		if shown, withheld := reasonText(in); !withheld || shown != reasonWithheld {
+			t.Errorf("%s: %q was shown as %q", name, in, shown)
+		}
+	}
+}
+
+func TestTheWeakKeyFindingIsShownOnlyWhenItMatchesTheBrokersFormat(t *testing.T) {
+	for _, in := range []string{
+		"The RSA key is only 1024 bits long, which is below today's minimum.",
+		"The ECDSA key is only 224 bits long, which is below today's minimum.",
+	} {
+		if shown, withheld := reasonText(in); withheld || shown != in {
+			t.Errorf("%q: got %q (withheld %v)", in, shown, withheld)
+		}
+	}
+	for name, in := range map[string]string{
+		"another algorithm": "The DSA key is only 1024 bits long, which is below today's minimum.",
+		"letters for bits":  "The RSA key is only 10k4 bits long, which is below today's minimum.",
+		"no bits":           "The RSA key is only  bits long, which is below today's minimum.",
+		"text after":        "The RSA key is only 1024 bits long, which is below today's minimum. token",
+		"text before":       "token The RSA key is only 1024 bits long, which is below today's minimum.",
+		"a pair in the end": "The RSA key is only 1024 bits long, which is below today's minimum.=x",
+		"a lowercase word":  "the RSA key is only 1024 bits long, which is below today's minimum.",
 	} {
 		if shown, withheld := reasonText(in); !withheld || shown != reasonWithheld {
 			t.Errorf("%s: %q was shown as %q", name, in, shown)
