@@ -329,3 +329,10 @@ func TestDirectorTextThatPrintsAsSentLosesItsControlCharacters(t *testing.T) {
 		}
 	})
 }
+
+func TestTheCodeIsCheckedWhenADescriptionFollowsIt(t *testing.T) {
+	got := APIError{Code: leakyText, Description: "the plan is unknown"}.Error()
+	if leaks(got) || !strings.Contains(got, reasonWithheld) || !strings.Contains(got, "the plan is unknown") {
+		t.Errorf("got %q", got)
+	}
+}
