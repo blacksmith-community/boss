@@ -1,0 +1,5 @@
+{
+  "code": "deployment_not_managed",
+  "error": "deployment fixture-dep is not managed by this broker",
+  "success": false
+}

@@ -1,0 +1,52 @@
+package main
+
+import (
+	"errors"
+	"strings"
+	"testing"
+)
+
+func TestARawDeploymentTheBrokerDoesNotManageIsNamedAndFails(t *testing.T) {
+	b := newBroker(t, nil)
+	b.status("POST /b/deployments/fixture-dep/restart", 403, "deployment_not_managed.json")
+	r, _, _ := testRunner(b.client(), "", true)
+	r.rawDeployment = "fixture-dep"
+
+	err := r.deploymentOp(nil, "restart")
+	var nm NotManagedError
+	if !errors.As(err, &nm) {
+		t.Fatalf("got %v, want a NotManagedError", err)
+	}
+	if nm.Deployment != "fixture-dep" || !strings.Contains(err.Error(), "does not manage") || !strings.Contains(err.Error(), "fixture-dep") {
+		t.Errorf("message: %v", err)
+	}
+}
+
+func TestRedeployFallbackToADeploymentTheBrokerDoesNotManageFails(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "v182_status.json"})
+	b.route("POST /b/"+fixtureID+"/recreate", func(int) reply {
+		return reply{Status: 404, File: "v182_instance_action_not_found.txt", ContentType: "text/plain"}
+	})
+	b.status("POST /b/deployments/redis-small-11111111/recreate", 403, "deployment_not_managed.json")
+	r, _, _ := testRunner(b.client(), "", true)
+
+	var nm NotManagedError
+	if err := r.redeploy([]string{fixtureID}, false, false); !errors.As(err, &nm) {
+		t.Fatalf("got %v, want a NotManagedError", err)
+	}
+}
+
+func TestOtherForbiddenAnswersKeepTheirOwnMessage(t *testing.T) {
+	b := newBroker(t, nil)
+	b.route("POST /b/deployments/fixture-dep/restart", func(int) reply {
+		return reply{Status: 403, Body: `{"code":"forbidden","error":"nope","success":false}`}
+	})
+	r, _, _ := testRunner(b.client(), "", true)
+	r.rawDeployment = "fixture-dep"
+
+	err := r.deploymentOp(nil, "restart")
+	var nm NotManagedError
+	if err == nil || errors.As(err, &nm) {
+		t.Fatalf("got %v, want the plain API error", err)
+	}
+}

@@ -48,6 +48,7 @@ run() {
 }
 
 run "$HEAD" internal/api api.go "$OUT/head"
+run "$HEAD" internal/apierr apierr.go "$OUT/head"
 run "$HEAD" internal/broker broker.go "$OUT/head"
 run "$HEAD" internal/handlers/blacksmith blacksmith.go "$OUT/head"
 run "$HEAD" internal/handlers/bosh bosh.go "$OUT/head"

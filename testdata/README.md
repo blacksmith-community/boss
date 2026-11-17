@@ -78,6 +78,10 @@ The file `params.json` and its twin `params.yml` are inputs that we hand to Boss
 
   The answers to the last operation poll for an instance that is in progress, succeeded, failed, or gone.
 
+- `deployment_not_managed.json`
+
+  The 403 a newer broker sends when a deployment action names a deployment it does not manage, built from the broker's own error writer.
+
 - `*.txt`
 
   Plain-text 404 bodies. The router sends them for a route the broker does not have, which is how Boss can tell an old broker from a missing instance.

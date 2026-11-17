@@ -483,6 +483,9 @@ func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, er
 		var apiErr APIError
 		if json.Unmarshal(b, &apiErr) == nil && apiErr.Code != "" {
 			apiErr.Status = res.StatusCode
+			if apiErr.BrokerCode == "deployment_not_managed" {
+				return res.StatusCode, b, NotManagedError{Deployment: deploymentInPath(path), Message: apiErr.Code}
+			}
 			return res.StatusCode, b, apiErr
 		}
 
@@ -581,4 +584,33 @@ func commandKey(key, file string) (string, error) {
 	}
 	line, _, _ := strings.Cut(string(b), "\n")
 	return strings.TrimSpace(line), nil
+}
+
+// NotManagedError says the broker refused an action on a deployment it
+// does not manage. Older brokers never send this code.
+type NotManagedError struct {
+	Deployment string
+	Message    string
+}
+
+func (e NotManagedError) Error() string {
+	if e.Deployment == "" {
+		return "the broker does not manage that deployment, so it refused the request"
+	}
+	return fmt.Sprintf("the broker does not manage deployment %s, so it refused the request", e.Deployment)
+}
+
+// deploymentInPath returns the deployment name from a /b/deployments/NAME/...
+// path, or an empty string for any other path.
+func deploymentInPath(path string) string {
+	rest, ok := strings.CutPrefix(path, "/b/deployments/")
+	if !ok {
+		return ""
+	}
+	name, _, _ := strings.Cut(rest, "/")
+	name, _, _ = strings.Cut(name, "?")
+	if unescaped, err := url.PathUnescape(name); err == nil {
+		return unescaped
+	}
+	return name
 }
