@@ -140,7 +140,7 @@ func (e RedirectError) Error() string {
 // did not name and the command key never leaves the broker.
 func checkRedirect(req *http.Request, via []*http.Request) error {
 	first := via[0]
-	target := req.URL.Redacted()
+	target := scrubURL(req.URL.String())
 
 	switch {
 	case first.Method != http.MethodGet && first.Method != http.MethodHead:
@@ -416,6 +416,10 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 
 	res, err := c.httpClient().Do(req)
 	if err != nil {
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			ue.URL = scrubURL(ue.URL)
+		}
 		if !connected.Load() {
 			return nil, NotSentError{Cause: err}
 		}
@@ -613,4 +617,20 @@ func deploymentInPath(path string) string {
 		return unescaped
 	}
 	return name
+}
+
+// scrubURL drops the userinfo, the query, and the fragment from a URL so
+// an error never shows a password, a token, or an operation value that
+// the URL carried, including one a server put in a Location header. A
+// string that does not parse as a URL is not shown at all.
+func scrubURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "[unparsable URL]"
+	}
+	u.User = nil
+	u.RawQuery = ""
+	u.ForceQuery = false
+	u.Fragment = ""
+	return u.String()
 }
