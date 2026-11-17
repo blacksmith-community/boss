@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -244,4 +246,32 @@ func TestDebugHidesProvisionParameters(t *testing.T) {
 	if strings.Contains(logged.String(), "fixture-param-value") {
 		t.Errorf("parameters leaked:\n%s", logged.String())
 	}
+}
+
+func TestParamsRefuseKeysThatAreNotStrings(t *testing.T) {
+	for text, want := range map[string]string{
+		"{\"a\": 1}\n":                 "",
+		"1: one\n":                     "parameters key 1",
+		"a:\n  true: yes\n":            "parameters.a key true",
+		"a:\n  - b:\n      2: x\n":     "parameters.a[0].b key 2",
+		"list:\n  - 1\n  - {3.5: z}\n": "parameters.list[1] key 3.5",
+	} {
+		_, err := parseParams(writeParams(t, text))
+		switch {
+		case want == "" && err != nil:
+			t.Errorf("%q: %v", text, err)
+		case want != "" && (err == nil || !strings.Contains(err.Error(), want)):
+			t.Errorf("%q: got %v, want %q", text, err, want)
+		}
+	}
+}
+
+func writeParams(t *testing.T, text string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "p.yml")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

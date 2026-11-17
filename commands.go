@@ -290,7 +290,11 @@ func parseParams(value string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("parameters are not valid JSON or YAML: %w", err)
 	}
 
-	out, ok := normalize(raw).(map[string]interface{})
+	norm, err := normalize("parameters", raw)
+	if err != nil {
+		return nil, err
+	}
+	out, ok := norm.(map[string]interface{})
 	if !ok {
 		return nil, errors.New("parameters must be an object")
 	}
@@ -298,20 +302,34 @@ func parseParams(value string) (map[string]interface{}, error) {
 }
 
 // normalize turns the maps yaml.v2 reads into maps that encode as JSON.
-func normalize(v interface{}) interface{} {
+// JSON keys are strings, so a key of any other type is refused, and the
+// error names where it sits.
+func normalize(path string, v interface{}) (interface{}, error) {
 	switch t := v.(type) {
 	case map[interface{}]interface{}:
 		m := make(map[string]interface{}, len(t))
 		for k, val := range t {
-			m[fmt.Sprint(k)] = normalize(val)
+			key, ok := k.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s key %v is not a string; quote it so it is read as text", path, k)
+			}
+			n, err := normalize(path+"."+key, val)
+			if err != nil {
+				return nil, err
+			}
+			m[key] = n
 		}
-		return m
+		return m, nil
 	case []interface{}:
 		for i := range t {
-			t[i] = normalize(t[i])
+			n, err := normalize(fmt.Sprintf("%s[%d]", path, i), t[i])
+			if err != nil {
+				return nil, err
+			}
+			t[i] = n
 		}
 	}
-	return v
+	return v, nil
 }
 
 // create provisions a service instance.
