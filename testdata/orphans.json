@@ -1,0 +1,11 @@
+{
+  "orphans": [
+    {"instance_id": "33333333-aaaa-bbbb-cccc-000000000009", "instance_name": "fixture-gone", "deployment_name": "small-33333333-aaaa-bbbb-cccc-000000000009", "service_id": "redis", "plan_id": "redis-small", "orphaned_at": "2026-11-02T00:00:00Z", "reason": "service instance not found in Cloud Foundry", "check_count": 3, "seconds_left": 7200, "due": false, "basis": "age"},
+    {"instance_id": "33333333-aaaa-bbbb-cccc-000000000010", "deployment_name": "small-33333333-aaaa-bbbb-cccc-000000000010", "orphaned_at": "2026-11-01T00:00:00Z", "reason": "fixture reason", "check_count": 9, "seconds_left": null, "due": true, "basis": "checks"}
+  ],
+  "unclaimed": [{"instance_id": "44444444-aaaa-bbbb-cccc-000000000001", "deployment_name": "small-44444444-aaaa-bbbb-cccc-000000000001", "first_seen": "2026-11-01T12:00:00Z"}],
+  "unclaimed_known": true,
+  "unclaimed_as_of": "2026-11-03T06:00:00Z",
+  "removal_after_seconds": 86400,
+  "timestamp": 1790000000
+}

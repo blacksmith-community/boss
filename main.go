@@ -140,6 +140,10 @@ var opt struct {
 		Reset struct{} `cli:"reset"`
 	} `cli:"resurrection"`
 
+	Monitor struct{} `cli:"monitor"`
+
+	Orphans struct{} `cli:"orphans"`
+
 	Manifest struct{} `cli:"manifest"`
 
 	Creds struct{} `cli:"creds"`
@@ -725,6 +729,29 @@ func main() {
 		}
 
 		finish(command, newRunner(connect(), ctx).resurrection(args, strings.TrimPrefix(command, "resurrection ")))
+		os.Exit(0)
+
+	case "monitor":
+		if opt.Help {
+			usage("@C{monitor}")
+			options()
+			os.Exit(0)
+		}
+
+		finish("monitor", newRunner(connect(), ctx).monitor(args))
+		os.Exit(0)
+
+	case "orphans":
+		if opt.Help {
+			usage("@C{orphans}")
+			fmt.Printf("Lists the instances the broker marked orphaned and the deployments it\n")
+			fmt.Printf("leaves alone.  It only reads.  The broker's cleanup route is not\n")
+			fmt.Printf("implemented, so Boss cannot remove orphans.\n\n")
+			options()
+			os.Exit(0)
+		}
+
+		finish("orphans", newRunner(connect(), ctx).orphans(args))
 		os.Exit(0)
 
 	case "manifest":

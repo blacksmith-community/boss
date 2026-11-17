@@ -1,0 +1,11 @@
+{
+  "running": true,
+  "service_count": 2,
+  "normal_interval": "1h0m0s",
+  "failed_interval": "5m0s",
+  "services": [
+    {"service_id": "11111111-aaaa-bbbb-cccc-000000000001", "deployment_name": "small-11111111-aaaa-bbbb-cccc-000000000001", "last_status": "running", "last_check": "2026-11-03T07:00:00Z", "next_check": "2026-11-03T08:00:00Z", "is_due": false, "failure_count": 0, "is_healthy": true, "is_provisioning": false},
+    {"service_id": "11111111-aaaa-bbbb-cccc-000000000002", "deployment_name": "large-11111111-aaaa-bbbb-cccc-000000000002", "last_status": "failing", "last_check": "2026-11-03T07:30:00Z", "next_check": "2026-11-03T07:35:00Z", "is_due": true, "failure_count": 3, "is_healthy": false, "is_provisioning": false}
+  ],
+  "summary": {"total": 2, "due_for_check": 1, "healthy": 1, "failing": 1, "provisioning": 0}
+}
