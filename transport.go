@@ -102,7 +102,7 @@ func traceHeaders(w io.Writer, h http.Header) {
 			if lower == "authorization" || lower == strings.ToLower(commandKeyHeader) {
 				v = redacted
 			}
-			fmt.Fprintf(w, "%s: %s\n", name, v)
+			_, _ = fmt.Fprintf(w, "%s: %s\n", name, v)
 		}
 	}
 }

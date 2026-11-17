@@ -403,7 +403,7 @@ func finish(command string, err error) {
 		os.Exit(1)
 	}
 
-	fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", err)
+	_, _ = fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", err)
 	os.Exit(1)
 }
 
