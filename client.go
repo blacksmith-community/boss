@@ -544,7 +544,8 @@ type TaskEvent struct {
 	} `json:"error,omitempty"`
 }
 
-// String renders the event as one line of text.
+// String renders the event as one line of text. The error is director output
+// for a task the operator asked to see, so it prints as sent.
 func (e TaskEvent) String() string {
 	line := e.Time.UTC().Format("15:04:05")
 	if e.Stage != "" {
@@ -557,7 +558,7 @@ func (e TaskEvent) String() string {
 		line += " " + e.State
 	}
 	if e.Error != nil {
-		line += fmt.Sprintf(" (error %d: %s)", e.Error.Code, shownReason(e.Error.Message))
+		line += fmt.Sprintf(" (error %d: %s)", e.Error.Code, e.Error.Message)
 	}
 	return line
 }

@@ -173,12 +173,14 @@ func (r *runner) taskProgress(taskID int) pollFunc {
 		case "done":
 			return true, nil
 		case "error", "cancelled", "timeout":
+			// This is director output for a task the operator asked to
+			// follow, so it prints as sent.
 			why := task.Error
 			if why == "" {
 				why = task.Result
 			}
 			if why != "" {
-				why = ": " + shownReason(why)
+				why = ": " + why
 			}
 			return true, fmt.Errorf("BOSH task %d ended as %s%s", taskID, task.State, why)
 		}

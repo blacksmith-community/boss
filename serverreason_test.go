@@ -146,3 +146,35 @@ func TestABadFilterNamesTheFilterTheOperatorPassed(t *testing.T) {
 		t.Errorf("the API error is lost: %v", err)
 	}
 }
+
+const directorError = "Failed to find variable '/dir/dep/db_password' from config server"
+
+func TestADirectorErrorInATaskPrintsAsSent(t *testing.T) {
+	t.Run("task log", func(t *testing.T) {
+		b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+		b.route("GET /b/"+fixtureID+"/task/log", func(int) reply {
+			return reply{Status: 200, Body: `[{"time":"2026-01-01T08:00:00Z","stage":"Updating","task":"redis/0","state":"failed","error":{"code":100,"message":"` + directorError + `"}}]`}
+		})
+		r, out, _ := testRunner(b.client(), "", true)
+		if err := r.task([]string{fixtureID}, false); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), directorError) {
+			t.Errorf("output %q", out)
+		}
+	})
+
+	t.Run("followed task failure", func(t *testing.T) {
+		for _, field := range []string{"error", "result"} {
+			b := followBroker(t)
+			body := `{"task":{"id":5104,"state":"error","` + field + `":"` + directorError + `"},"events":[]}`
+			b.route("GET /b/tasks/5104", func(int) reply { return reply{Status: 200, Body: body} })
+			r, cancel := followRunner(t, b)
+			err := r.follow(fixtureID, nil, r.taskProgress(5104))
+			cancel()
+			if err == nil || !strings.Contains(err.Error(), directorError) {
+				t.Errorf("%s: got %v", field, err)
+			}
+		}
+	})
+}
