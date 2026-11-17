@@ -32,7 +32,7 @@ func (e APIError) Error() string {
 	if e.Description != "" {
 		msg = fmt.Sprintf("%s: %s", machineOrReason(e.Code), shownReason(e.Description))
 	}
-	if e.BrokerCode != "" {
+	if brokerCodes[e.BrokerCode] {
 		msg += " (" + e.BrokerCode + ")"
 	}
 	if e.Status == 504 {

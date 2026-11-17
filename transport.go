@@ -681,6 +681,66 @@ func shownReason(s string) string {
 	return shown
 }
 
+// brokerCodes are the machine codes the broker writes in the code field of
+// an error answer. They are the constants of the broker's internal/apierr
+// package, plus internal_error from pkg/http/response and the E007 and E008
+// codes of the security middleware in pkg/services. A code that is not on
+// the list is not shown, so the field cannot carry text of any other kind.
+var brokerCodes = map[string]bool{
+	"approval_mismatch":           true,
+	"candidate_invalid":           true,
+	"cf_auth_failed":              true,
+	"cf_not_cloud_foundry":        true,
+	"cf_tls_failed":               true,
+	"cf_unreachable":              true,
+	"cleanup_not_started":         true,
+	"command_credential_required": true,
+	"command_too_long":            true,
+	"commands_disabled":           true,
+	"credhub_not_configured":      true,
+	"credhub_unavailable":         true,
+	"deployment_locked":           true,
+	"deployment_not_managed":      true,
+	"director_unavailable":        true,
+	"director_unsupported":        true,
+	"instance_busy":               true,
+	"instance_not_found":          true,
+	"internal_error":              true,
+	"invalid_filter":              true,
+	"invalid_mode":                true,
+	"invalid_request":             true,
+	"invalid_run_user":            true,
+	"invalid_settings":            true,
+	"invalid_task_state":          true,
+	"inventory_disabled":          true,
+	"max_in_flight_too_high":      true,
+	"no_health_gate":              true,
+	"no_selections":               true,
+	"not_awaiting_decision":       true,
+	"not_found":                   true,
+	"not_rotatable":               true,
+	"outcome_unknown":             true,
+	"patch_disabled":              true,
+	"patch_unsupported":           true,
+	"preview_bound":               true,
+	"preview_expired":             true,
+	"preview_mismatch":            true,
+	"request_id_conflict":         true,
+	"root_disabled":               true,
+	"rotation_disabled":           true,
+	"signing_ca_changed":          true,
+	"ssh_disabled":                true,
+	"tasks_loading":               true,
+	"timeout_out_of_range":        true,
+	"unknown_variable":            true,
+	"unsupported_media_type":      true,
+	"upgrade_preview_required":    true,
+	"vault_unavailable":           true,
+	"vms_not_running":             true,
+	"E007":                        true,
+	"E008":                        true,
+}
+
 // asSent cleans director text that prints as sent, which skips the secret
 // check. It drops control and format characters, such as an escape sequence
 // or a bidirectional override, so the text cannot steer the terminal, and

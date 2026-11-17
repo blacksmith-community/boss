@@ -336,3 +336,18 @@ func TestTheCodeIsCheckedWhenADescriptionFollowsIt(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestOnlyABrokerCodePrintsInParentheses(t *testing.T) {
+	for _, code := range []string{"deployment_locked", "instance_not_found", "vault_unavailable", "internal_error", "command_credential_required", "E008"} {
+		got := APIError{Code: "a message", BrokerCode: code}.Error()
+		if got != "a message ("+code+")" {
+			t.Errorf("%s: got %q", code, got)
+		}
+	}
+	for _, code := range []string{"hunter2", "0123456789abcdef0123456789abcdef", "db_password_hunter2", "two words", "tab\there", "esc\x1b[31m", "Vault_Unavailable", "vault_unavailable "} {
+		got := APIError{Code: "a message", BrokerCode: code}.Error()
+		if got != "a message" {
+			t.Errorf("%q: got %q", code, got)
+		}
+	}
+}
