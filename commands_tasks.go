@@ -16,7 +16,7 @@ func (r *runner) table(headers []string, rows [][]string) {
 	for _, row := range rows {
 		cells := make([]interface{}, len(row))
 		for i, c := range row {
-			cells[i] = c
+			cells[i] = cell(c)
 		}
 		t.Row(nil, cells...)
 	}
@@ -96,7 +96,7 @@ func (r *runner) tasksOutput(args []string, kind string) error {
 		return err
 	}
 
-	_, err = io.WriteString(r.out, strings.TrimRight(text, "\n")+"\n")
+	_, err = io.WriteString(r.out, asSent(strings.TrimRight(text, "\n")+"\n"))
 	return err
 }
 

@@ -78,7 +78,7 @@ func (r *runner) confirm(format string, args ...interface{}) error {
 
 // printf writes plain text, with no color markup parsed from the data.
 func (r *runner) printf(format string, args ...interface{}) {
-	_, _ = fmt.Fprintf(r.out, format, args...)
+	_, _ = io.WriteString(r.out, asSent(fmt.Sprintf(format, args...)))
 }
 
 // eventKey identifies one task event, so a log that restarts with a new
@@ -157,7 +157,7 @@ func (r *runner) operationProgress(id string, ref OperationRef) pollFunc {
 		case "failed":
 			return true, fmt.Errorf("the operation failed: %s", shownReason(op.Description))
 		}
-		return true, fmt.Errorf("the broker reported the unknown state %q for the operation", op.State)
+		return true, fmt.Errorf("the broker reported the unknown state %q for the operation", shownReason(op.State))
 	}}
 }
 

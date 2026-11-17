@@ -17,7 +17,7 @@ var Version = "(dev)"
 
 func bail(e error) {
 	if e != nil {
-		fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", e)
+		fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", asSent(e.Error()))
 		os.Exit(1)
 	}
 }
@@ -453,7 +453,7 @@ func finish(command string, err error) {
 		return
 	}
 
-	_, _ = fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", err)
+	_, _ = fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", asSent(err.Error()))
 	exit(exitCode(err))
 }
 
@@ -550,7 +550,7 @@ func main() {
 					pname = instance.Plan.Name
 				}
 
-				t.Row(nil, instance.ID, sname, sid, pname, pid)
+				t.Row(nil, cell(instance.ID), cell(sname), cell(sid), cell(pname), cell(pid))
 			}
 			t.Output(os.Stdout)
 
@@ -567,7 +567,7 @@ func main() {
 					pname = instance.Plan.Name
 				}
 
-				t.Row(nil, instance.ID, sname, pname)
+				t.Row(nil, cell(instance.ID), cell(sname), cell(pname))
 			}
 			t.Output(os.Stdout)
 
@@ -611,7 +611,7 @@ func main() {
 					tags = "(none)"
 				}
 
-				t.Row(nil, s.Name, s.ID, plans, ids, tags)
+				t.Row(nil, cell(s.Name), cell(s.ID), cell(plans), cell(ids), cell(tags))
 				t.Row(nil, "", "", "", "", "")
 			}
 			t.Output(os.Stdout)
@@ -636,7 +636,7 @@ func main() {
 					tags = "(none)"
 				}
 
-				t.Row(nil, s.Name, plans, tags)
+				t.Row(nil, cell(s.Name), cell(plans), cell(tags))
 				t.Row(nil, "", "", "")
 			}
 			t.Output(os.Stdout)

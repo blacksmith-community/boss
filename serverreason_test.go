@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -388,4 +390,59 @@ func TestCredsErrorBodyAndStatusTextPassThroughTheReasonRule(t *testing.T) {
 	if err == nil || leaks(err.Error()) || !strings.Contains(err.Error(), reasonWithheld) {
 		t.Errorf("got %v", err)
 	}
+}
+
+func TestEveryPrintedStringLosesItsControlCharacters(t *testing.T) {
+	esc := "\x1b[31m\u202e"
+	bad := func(s string) string { return strings.NewReplacer("\x1b", `\u001b`, "\u202e", `\u202e`).Replace(s) }
+	dirty := func(out string) bool { return strings.ContainsAny(out, "\x1b\u202e") }
+
+	t.Run("printf and table", func(t *testing.T) {
+		b := newBroker(t, nil)
+		body := withText(t, "batch_list.json", "fixture stemcell upgrade", "name"+bad(esc)+"\\nnext")
+		b.route("GET /b/upgrade/tasks", func(int) reply { return reply{Status: 200, Body: body} })
+		r, out, _ := testRunner(b.client(), "", true)
+		if err := r.batchList(nil); err != nil {
+			t.Fatal(err)
+		}
+		if dirty(out.String()) || !strings.Contains(out.String(), "name[31m next") {
+			t.Errorf("output %q", out)
+		}
+	})
+
+	t.Run("a printed name", func(t *testing.T) {
+		r, out, _ := testRunner(newBroker(t, nil).client(), "", true)
+		r.printf("Deployment %s\n", "dep"+esc)
+		if dirty(out.String()) {
+			t.Errorf("output %q", out)
+		}
+	})
+
+	t.Run("task output", func(t *testing.T) {
+		b := newBroker(t, nil)
+		b.route("GET /b/tasks/7/output", func(int) reply { return reply{Status: 200, Body: `{"output":"line` + bad(esc) + `"}`} })
+		b.route("GET /b/tasks/7/output/result", func(int) reply { return reply{Status: 200, Body: `{"output":"line` + bad(esc) + `"}`} })
+		r, out, _ := testRunner(b.client(), "", true)
+		_ = r.tasksOutput([]string{"7"}, "result")
+		if dirty(out.String()) {
+			t.Errorf("output %q", out)
+		}
+	})
+
+	t.Run("the final error", func(t *testing.T) {
+		old := os.Stderr
+		rd, wr, _ := os.Pipe()
+		os.Stderr = wr
+		code := -1
+		oldExit := exit
+		exit = func(c int) { code = c }
+		finish("list", errors.New("failed"+esc))
+		exit = oldExit
+		os.Stderr = old
+		_ = wr.Close()
+		got, _ := io.ReadAll(rd)
+		if code == -1 || dirty(string(got)) || !strings.Contains(string(got), "failed") {
+			t.Errorf("stderr %q", got)
+		}
+	})
 }

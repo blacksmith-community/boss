@@ -780,6 +780,12 @@ func asSent(s string) string {
 	}, s)
 }
 
+// cell cleans text for one table cell, which is one line, so a newline or a
+// tab becomes a space as well.
+func cell(s string) string {
+	return strings.Join(strings.Fields(asSent(strings.NewReplacer("\n", " ", "\t", " ").Replace(s))), " ")
+}
+
 // brokerErrorCodes are the short codes the broker puts in the error field
 // of an Open Service Broker answer. They are taken from the osbapi package
 // that the broker vendors, in github.com/fivetwenty-io/osbapi/v2/pkg/osbapi,

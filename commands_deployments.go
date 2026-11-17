@@ -110,18 +110,18 @@ func (r *runner) errand(args, instances []string) error {
 
 	r.printf("Errand %s exited with %d.\n", res.Errand, res.ExitCode)
 	if res.Stdout != "" {
-		_, _ = io.WriteString(r.out, "\n--- stdout ---\n"+strings.TrimRight(res.Stdout, "\n")+"\n")
+		_, _ = io.WriteString(r.out, asSent("\n--- stdout ---\n"+strings.TrimRight(res.Stdout, "\n")+"\n"))
 	}
 	if res.Stderr != "" {
-		_, _ = io.WriteString(r.out, "\n--- stderr ---\n"+strings.TrimRight(res.Stderr, "\n")+"\n")
+		_, _ = io.WriteString(r.out, asSent("\n--- stderr ---\n"+strings.TrimRight(res.Stderr, "\n")+"\n"))
 	}
 	for _, e := range res.Results {
 		r.printf("\n%s (%s) exited with %d.\n", e.Instance, e.InstanceID, e.ExitCode)
 		if e.Stdout != "" {
-			_, _ = io.WriteString(r.out, strings.TrimRight(e.Stdout, "\n")+"\n")
+			_, _ = io.WriteString(r.out, asSent(strings.TrimRight(e.Stdout, "\n")+"\n"))
 		}
 		if e.Stderr != "" {
-			_, _ = io.WriteString(r.out, strings.TrimRight(e.Stderr, "\n")+"\n")
+			_, _ = io.WriteString(r.out, asSent(strings.TrimRight(e.Stderr, "\n")+"\n"))
 		}
 	}
 
