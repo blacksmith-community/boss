@@ -10,11 +10,14 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -80,7 +83,34 @@ type UnknownOutcomeError struct {
 }
 
 func (e UnknownOutcomeError) Error() string {
-	return fmt.Sprintf("the %s request timed out, so its outcome is unknown and the action may still be running; check boss tasks list before running it again", e.Method)
+	how := "ended before the broker answered"
+	if timedOut(e.Cause) {
+		how = "timed out"
+	}
+	return fmt.Sprintf("the %s request %s after it was sent, so its outcome is unknown and the action may still be running; check boss tasks list before running it again", e.Method, how)
+}
+
+// NotSentError marks a failure that happened before any connection to the
+// broker existed, so no byte of the request left this machine.
+type NotSentError struct{ Cause error }
+
+func (e NotSentError) Error() string {
+	return "nothing was sent to the broker: " + e.Cause.Error()
+}
+
+func (e NotSentError) Unwrap() error { return e.Cause }
+
+// cutOff says whether err means a request that was sent never got its
+// answer, because the connection ended, was reset, timed out, or was
+// cancelled.
+func cutOff(err error) bool {
+	return timedOut(err) ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded)
 }
 
 func (e UnknownOutcomeError) Unwrap() error { return e.Cause }
@@ -303,6 +333,10 @@ func (c Client) doWithRetry(method, path string, in interface{}) (*http.Response
 // refused says whether the error is a failure to connect, which happens
 // before any byte of the request leaves.
 func refused(err error) bool {
+	var ns NotSentError
+	if errors.As(err, &ns) {
+		return true
+	}
 	var op *net.OpError
 	if errors.As(err, &op) && op.Op == "dial" {
 		return true
@@ -385,9 +419,19 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 		_, _ = fmt.Fprintf(c.stderr(), "=================================\n%s\n", buf.String())
 	}
 
+	// Until a connection exists, nothing of the request has left.
+	var connected atomic.Bool
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+		GotConn: func(httptrace.GotConnInfo) { connected.Store(true) },
+	}))
+
 	res, err := c.httpClient().Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
+		err = fmt.Errorf("HTTP request failed: %w", err)
+		if !connected.Load() {
+			return nil, NotSentError{Cause: err}
+		}
+		return nil, err
 	}
 
 	if c.Trace {
@@ -405,7 +449,8 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, error) {
 	res, err := c.do(method, path, in)
 	if err != nil {
-		if !idempotent(method) && timedOut(err) {
+		var ns NotSentError
+		if !idempotent(method) && !errors.As(err, &ns) && cutOff(err) {
 			return 0, nil, UnknownOutcomeError{Method: method, Cause: err}
 		}
 		return 0, nil, fmt.Errorf("request failed: %w", err)
