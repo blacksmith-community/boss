@@ -468,11 +468,6 @@ func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, er
 		_, _ = fmt.Fprintf(c.stderr(), "BODY: %s\n", responseLogBody(path, b))
 	}
 
-	if method == http.MethodDelete && res.StatusCode == 410 {
-		/* this is okay - already deleted */
-		return res.StatusCode, b, nil
-	}
-
 	// Brokers before the lifecycle routes answer an unknown route with a
 	// plain-text 404, which no instance lookup ever produces.
 	if res.StatusCode == 404 && isRouteMissing(b) {

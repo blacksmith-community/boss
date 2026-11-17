@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"sort"
@@ -509,12 +510,13 @@ func (c Client) Delete(ref InstanceRef) error {
 	q.Set("plan_id", ref.PlanID)
 	q.Set("service_id", ref.ServiceID)
 
-	status, err := c.long().request("DELETE", "/v2/service_instances/"+url.PathEscape(ref.ID)+"?"+q.Encode(), nil, nil)
+	_, err := c.long().request("DELETE", "/v2/service_instances/"+url.PathEscape(ref.ID)+"?"+q.Encode(), nil, nil)
+	var api APIError
+	if errors.As(err, &api) && api.Status == http.StatusGone {
+		return fmt.Errorf("failed to delete instance %s: %w", ref.ID, ErrInstanceGone)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to delete instance %s: %w", ref.ID, err)
-	}
-	if status == 410 {
-		return fmt.Errorf("failed to delete instance %s: %w", ref.ID, ErrInstanceGone)
 	}
 	return nil
 }
