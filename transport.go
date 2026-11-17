@@ -304,6 +304,11 @@ func (c Client) doWithRetry(method, path string, in interface{}) (*http.Response
 
 		select {
 		case <-c.context().Done():
+			// A refused request never left, whatever happens to the pause.
+			var ns NotSentError
+			if errors.As(lastErr, &ns) {
+				return nil, NotSentError{Cause: c.context().Err()}
+			}
 			return nil, c.context().Err()
 		case <-time.After(pause):
 		}

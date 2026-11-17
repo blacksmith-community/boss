@@ -187,3 +187,24 @@ func TestAReadWhoseAnswerIsCutShortIsNotCalledUnknown(t *testing.T) {
 		t.Errorf("a read has no unknown outcome: %v", err)
 	}
 }
+
+func TestCtrlCDuringTheRetryPauseOfARefusedWriteSaysNothingWasSent(t *testing.T) {
+	srv := httptest.NewServer(nil)
+	url := srv.URL
+	srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	c := &Client{URL: url, MaxRetries: 3, Backoff: time.Hour, Ctx: ctx}
+	_, err := c.Redeploy(fixtureID, false)
+	if err == nil || !strings.Contains(err.Error(), "nothing was sent") {
+		t.Errorf("want nothing was sent, got %v", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "outcome is unknown") {
+		t.Errorf("no byte left, so the outcome is known: %v", err)
+	}
+}
