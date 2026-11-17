@@ -481,7 +481,7 @@ func commandKey(key, file string) (string, error) {
 		return key, nil
 	}
 
-	b, err := os.ReadFile(file)
+	b, err := os.ReadFile(file) // #nosec G304 -- the operator names the key file
 	if err != nil {
 		return "", fmt.Errorf("cannot read the command key file: %w", err)
 	}
