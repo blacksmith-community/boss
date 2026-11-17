@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -293,7 +294,7 @@ func (c Client) doWithRetry(method, path string, in interface{}) (*http.Response
 				if attempts == 1 {
 					return nil, err
 				}
-				return nil, fmt.Errorf("request failed after %d attempts: %w", attempts, err)
+				return nil, fmt.Errorf("gave up after %d attempts: %w", attempts, err)
 			}
 		}
 
@@ -326,12 +327,15 @@ func refused(err error) bool {
 	if errors.As(err, &op) && op.Op == "dial" {
 		return true
 	}
-	return strings.Contains(err.Error(), "connection refused")
+	return errors.Is(err, syscall.ECONNREFUSED)
 }
 
-// shouldRetry determines if an error is retryable
+// shouldRetry says whether a failed request may be sent again. It looks
+// at the type of the error and never at its text, because the text can
+// hold anything a server sent, such as the target of a redirect.
 func (c Client) shouldRetry(method string, err error) bool {
-	if errors.Is(err, context.Canceled) {
+	var redirect RedirectError
+	if errors.Is(err, context.Canceled) || errors.As(err, &redirect) {
 		return false
 	}
 
@@ -348,8 +352,8 @@ func (c Client) shouldRetry(method string, err error) bool {
 		return true
 	}
 
-	return strings.Contains(err.Error(), "timeout") ||
-		strings.Contains(err.Error(), "temporary failure")
+	var dns *net.DNSError
+	return errors.As(err, &dns) && (dns.IsTemporary || dns.IsTimeout)
 }
 
 // doSingle performs a single HTTP request
@@ -412,7 +416,6 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 
 	res, err := c.httpClient().Do(req)
 	if err != nil {
-		err = fmt.Errorf("HTTP request failed: %w", err)
 		if !connected.Load() {
 			return nil, NotSentError{Cause: err}
 		}
