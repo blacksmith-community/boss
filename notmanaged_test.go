@@ -111,8 +111,8 @@ func TestTheBrokersReasonShowsNoCredentialsOrControlCharacters(t *testing.T) {
 			t.Errorf("the message leaks %q: %q", leak, got)
 		}
 	}
-	if !strings.Contains(got, "host.example/p") {
-		t.Errorf("the message lost the URL host and path: %q", got)
+	if !strings.Contains(got, reasonWithheld) {
+		t.Errorf("a reason with a URL in it must be withheld: %q", got)
 	}
 }
 

@@ -13,7 +13,6 @@ import (
 	"net/http/httptrace"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -644,7 +643,7 @@ func commandKey(key, file string) (string, error) {
 type NotManagedError struct {
 	Deployment string
 	// Message is the text of the broker's error field. It comes from the
-	// server, so it is cleaned by plainText before anyone sees it.
+	// server, so reasonText cleans it, or withholds it, before anyone sees it.
 	Message string
 }
 
@@ -653,52 +652,74 @@ func (e NotManagedError) Error() string {
 	if e.Deployment != "" {
 		msg = fmt.Sprintf("the broker does not manage deployment %s, so it refused the request", e.Deployment)
 	}
-	if why := plainText(e.Message); why != "" {
+	switch why, withheld := reasonText(e.Message); {
+	case withheld:
+		msg += ". " + why
+	case why != "":
 		msg += ". The broker said: " + why
 	}
 	return msg
 }
 
-var (
-	urlInText = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://\S+`)
-
-	// bareUserinfo is user:password@ with no scheme in front, which is
-	// also what is left of a network-path reference such as //user:pw@host.
-	bareUserinfo = regexp.MustCompile(`[^\s/@:]+:[^\s/@]+@`)
-
-	// secretPair is a key=value pair whose key names a secret, such as
-	// password, passwd, secret, token, or key, alone or inside a longer
-	// name like api_key or access_token.
-	secretPair = regexp.MustCompile(`(?i)\b([a-z0-9_.-]*(?:password|passwd|secret|token|key)[a-z0-9_.-]*)=[^\s&;,)\]"']+`)
-)
-
 // maxReason is the most runes of a server's reason that an error shows.
 const maxReason = 512
 
-// plainText makes text from a server safe to show in one line. A URL in
-// it loses its userinfo, path parameters, query, and fragment, user:pw@
-// userinfo and the value of a secret-looking key=value pair are hidden,
-// a control or format character, such as a newline, an escape, or a
-// right-to-left override, becomes a space, and a long text is cut.
-func plainText(s string) string {
-	s = urlInText.ReplaceAllStringFunc(s, func(m string) string {
-		core := strings.TrimRight(m, ")],.;:!?\"'>")
-		return scrubURL(core) + m[len(core):]
-	})
-	s = bareUserinfo.ReplaceAllString(s, "")
-	s = secretPair.ReplaceAllString(s, "$1=[hidden]")
-	s = strings.Map(func(r rune) rune {
+// reasonWithheld is what an error says in place of a reason that may hold
+// a secret.
+const reasonWithheld = "The broker gave a reason that may hold a secret, so Boss does not show it."
+
+// riskyWords are the words that can mark a secret in a reason. A reason
+// that holds one anywhere, in any case, is not shown.
+var riskyWords = []string{"pass", "pw", "pwd", "secret", "token", "key", "auth", "credential", "cookie", "bearer"}
+
+// reasonText cleans the broker's reason for display. It fails closed.
+// Control and format characters become spaces first, and then a reason
+// that might hold a secret is withheld entirely, because no pattern can
+// list every shape a secret takes. That means any of = @ % " { or a URL,
+// or any risky word, which over-withholds and is meant to. The second
+// result says whether the reason was withheld. A reason that is shown
+// is on one line and cut at 512 runes.
+func reasonText(s string) (string, bool) {
+	spaced := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
 		}
 		return r
 	}, s)
-	s = strings.Join(strings.Fields(s), " ")
+	spaced = strings.Join(strings.Fields(spaced), " ")
 
-	if runes := []rune(s); len(runes) > maxReason {
-		s = string(runes[:maxReason]) + "…"
+	// The same text with those characters deleted shows a word that was
+	// split in two to get past the check.
+	joined := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, s)
+
+	for _, text := range []string{spaced, joined} {
+		if mayHoldSecret(text) {
+			return reasonWithheld, true
+		}
 	}
-	return s
+
+	if runes := []rune(spaced); len(runes) > maxReason {
+		spaced = string(runes[:maxReason]) + "…"
+	}
+	return spaced, false
+}
+
+func mayHoldSecret(s string) bool {
+	if strings.ContainsAny(s, "=@%\"{") || strings.Contains(s, "://") || strings.Contains(s, "//") {
+		return true
+	}
+	lower := strings.ToLower(s)
+	for _, word := range riskyWords {
+		if strings.Contains(lower, word) {
+			return true
+		}
+	}
+	return false
 }
 
 // deploymentInPath returns the deployment name from a /b/deployments/NAME/...
