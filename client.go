@@ -558,7 +558,7 @@ func (e TaskEvent) String() string {
 		line += " " + e.State
 	}
 	if e.Error != nil {
-		line += fmt.Sprintf(" (error %d: %s)", e.Error.Code, e.Error.Message)
+		line += fmt.Sprintf(" (error %d: %s)", e.Error.Code, asSent(e.Error.Message))
 	}
 	return line
 }

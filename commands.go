@@ -180,7 +180,7 @@ func (r *runner) taskProgress(taskID int) pollFunc {
 				why = task.Result
 			}
 			if why != "" {
-				why = ": " + why
+				why = ": " + asSent(why)
 			}
 			return true, fmt.Errorf("BOSH task %d ended as %s%s", taskID, task.State, why)
 		}

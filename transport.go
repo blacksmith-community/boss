@@ -681,6 +681,22 @@ func shownReason(s string) string {
 	return shown
 }
 
+// asSent cleans director text that prints as sent, which skips the secret
+// check. It drops control and format characters, such as an escape sequence
+// or a bidirectional override, so the text cannot steer the terminal, and
+// it keeps newlines and tabs.
+func asSent(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
 // brokerErrorCodes are the short codes the broker puts in the error field
 // of an Open Service Broker answer. They are taken from the osbapi package
 // that the broker vendors, in github.com/fivetwenty-io/osbapi/v2/pkg/osbapi,

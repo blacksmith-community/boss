@@ -65,7 +65,7 @@ func (r *runner) tasksList(args []string, f TaskFilter) error {
 		for _, t := range list.Tasks {
 			if t.Error != "" {
 				// The error is director output for a task, so it prints as sent.
-				r.printf("\nTask %d failed: %s\n", t.ID, t.Error)
+				r.printf("\nTask %d failed: %s\n", t.ID, asSent(t.Error))
 			}
 		}
 	}

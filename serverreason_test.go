@@ -280,3 +280,52 @@ func TestAFailedTaskInTheListPrintsTheDirectorErrorAsSent(t *testing.T) {
 		t.Errorf("output %q", out)
 	}
 }
+
+func TestDirectorTextThatPrintsAsSentLosesItsControlCharacters(t *testing.T) {
+	dirty := "bad password \x1b[31mred\x1b[0m \u202eevil\u200b\x07 done\nsecond\tline"
+	clean := "bad password [31mred[0m evil done\nsecond\tline"
+	jsonText := `bad password \u001b[31mred\u001b[0m \u202eevil\u200b\u0007 done\nsecond\tline`
+
+	if got := asSent(dirty); got != clean {
+		t.Errorf("asSent: got %q", got)
+	}
+
+	t.Run("task log", func(t *testing.T) {
+		b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+		b.route("GET /b/"+fixtureID+"/task/log", func(int) reply {
+			return reply{Status: 200, Body: `[{"time":"2026-01-01T08:00:00Z","stage":"S","task":"t","state":"failed","error":{"code":1,"message":"` + jsonText + `"}}]`}
+		})
+		r, out, _ := testRunner(b.client(), "", true)
+		if err := r.task([]string{fixtureID}, false); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), clean) || strings.ContainsAny(out.String(), "\x1b\u202e\u200b\x07") {
+			t.Errorf("output %q", out)
+		}
+	})
+
+	t.Run("followed task", func(t *testing.T) {
+		b := followBroker(t)
+		body := `{"task":{"id":5104,"state":"error","error":"` + jsonText + `"},"events":[]}`
+		b.route("GET /b/tasks/5104", func(int) reply { return reply{Status: 200, Body: body} })
+		r, cancel := followRunner(t, b)
+		err := r.follow(fixtureID, nil, r.taskProgress(5104))
+		cancel()
+		if err == nil || !strings.Contains(err.Error(), clean) || strings.ContainsAny(err.Error(), "\x1b\u202e\u200b\x07") {
+			t.Errorf("got %q", err)
+		}
+	})
+
+	t.Run("task list", func(t *testing.T) {
+		b := newBroker(t, nil)
+		body := withText(t, "bosh_tasks.json", `"error": "fixture failure text"`, `"error": "`+jsonText+`"`)
+		b.route("GET /b/tasks", func(int) reply { return reply{Status: 200, Body: body} })
+		r, out, _ := testRunner(b.client(), "", true)
+		if err := r.tasksList(nil, TaskFilter{}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), clean) || strings.ContainsAny(out.String(), "\x1b\u202e\u200b\x07") {
+			t.Errorf("output %q", out)
+		}
+	})
+}
