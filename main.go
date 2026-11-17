@@ -387,6 +387,15 @@ func bad(command, msg string, args ...interface{}) {
 	}
 }
 
+// checkRawDeployment refuses --deployment on a command that would ignore
+// it, so an operator never believes it took effect.
+func checkRawDeployment(command, raw string) error {
+	if raw == "" || strings.HasPrefix(command, "deployment ") {
+		return nil
+	}
+	return fmt.Errorf("--deployment does not apply to `boss %s'; it names a director deployment for the boss deployment commands only", command)
+}
+
 // boolFlag turns a switch into the query value the broker reads.
 func boolFlag(b bool) string {
 	if b {
@@ -464,6 +473,10 @@ func main() {
 		commands()
 		options()
 		os.Exit(0)
+	}
+
+	if !opt.Help {
+		bail(checkRawDeployment(command, opt.RawDeployment))
 	}
 
 	switch command {
