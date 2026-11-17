@@ -216,14 +216,6 @@ func TestEveryPlaceThatShowsServerTextAppliesTheReasonRule(t *testing.T) {
 			_ = r.orphans(nil)
 			return out.String()
 		},
-		"a failed task in the list": func(t *testing.T) string {
-			b := newBroker(t, nil)
-			body := withText(t, "bosh_tasks.json", `"error": "fixture failure text"`, `"error": "`+bad+`"`)
-			b.route("GET /b/tasks", func(int) reply { return reply{Status: 200, Body: body} })
-			r, out, _ := testRunner(b.client(), "", true)
-			_ = r.tasksList(nil, TaskFilter{})
-			return out.String()
-		},
 		"a batch pause reason": func(t *testing.T) string {
 			return batchShowOutput(t, withText(t, "batch_job.json", `"paused": false,`, `"paused": true, "pause_reason": "`+bad+`",`))
 		},
@@ -269,4 +261,17 @@ func batchShowOutput(t *testing.T, body string) string {
 	r, out, _ := testRunner(b.client(), "", true)
 	_ = r.batchShow([]string{"fixture-batch-0001"})
 	return out.String()
+}
+
+func TestAFailedTaskInTheListPrintsTheDirectorErrorAsSent(t *testing.T) {
+	b := newBroker(t, nil)
+	body := withText(t, "bosh_tasks.json", `"error": "fixture failure text"`, `"error": "`+directorError+`"`)
+	b.route("GET /b/tasks", func(int) reply { return reply{Status: 200, Body: body} })
+	r, out, _ := testRunner(b.client(), "", true)
+	if err := r.tasksList(nil, TaskFilter{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), directorError) {
+		t.Errorf("output %q", out)
+	}
 }
