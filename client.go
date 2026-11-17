@@ -100,6 +100,9 @@ type Client struct {
 	Backoff time.Duration
 	// Ctx ends any request in flight when it is done (default: never)
 	Ctx context.Context
+	// RoundTripper, when set, carries every request in place of the shared
+	// transport. Tests use it to watch or script what goes out.
+	RoundTripper http.RoundTripper
 	// CommandKey is the second credential a broker asks for before it
 	// shows or resumes a batch command job
 	CommandKey string

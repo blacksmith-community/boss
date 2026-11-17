@@ -178,9 +178,13 @@ func checkRedirect(req *http.Request, via []*http.Request) error {
 
 // httpClient builds the HTTP client for one request.
 func (c Client) httpClient() *http.Client {
+	var rt http.RoundTripper = c.transport()
+	if c.RoundTripper != nil {
+		rt = c.RoundTripper
+	}
 	return &http.Client{
 		Timeout:       c.requestTimeout(),
-		Transport:     c.transport(),
+		Transport:     rt,
 		CheckRedirect: checkRedirect,
 	}
 }
