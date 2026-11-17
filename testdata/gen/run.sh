@@ -48,12 +48,12 @@ run() {
 }
 
 run "$HEAD" internal/api api.go "$OUT/head"
-run "$HEAD" internal/apierr apierr.go "$OUT/head"
 run "$HEAD" internal/broker broker.go "$OUT/head"
 run "$HEAD" internal/handlers/blacksmith blacksmith.go "$OUT/head"
 run "$HEAD" internal/handlers/bosh bosh.go "$OUT/head"
 run "$HEAD" internal/handlers/certificates certificates.go "$OUT/head"
 run "$HEAD" internal/handlers/deployments deployments.go "$OUT/head"
+run "$HEAD" internal/handlers/deployments ownership.go "$OUT/head"
 run "$HEAD" internal/handlers/services services.go "$OUT/head"
 run "$HEAD" internal/handlers/tasks tasks.go "$OUT/head"
 run "$HEAD" internal/handlers/upgrade upgrade.go "$OUT/head"

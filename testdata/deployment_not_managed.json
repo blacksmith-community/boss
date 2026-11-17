@@ -1,5 +1,5 @@
 {
   "code": "deployment_not_managed",
-  "error": "deployment fixture-dep is not managed by this broker",
+  "error": "deployment fixture-dep is not a deployment of one of this broker's service instances, so the broker will not change it",
   "success": false
 }

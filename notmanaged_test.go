@@ -50,3 +50,24 @@ func TestOtherForbiddenAnswersKeepTheirOwnMessage(t *testing.T) {
 		t.Fatalf("got %v, want the plain API error", err)
 	}
 }
+
+func TestOnlyTheCodeMakesAnAnswerNotManaged(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body string
+		want bool
+	}{
+		"the code with a message that never says it": {`{"code":"deployment_not_managed","error":"refused for reasons of its own","success":false}`, true},
+		"another code whose text says not managed":   {`{"code":"forbidden","error":"deployment fixture-dep is not managed by this broker","success":false}`, false},
+	} {
+		b := newBroker(t, nil)
+		b.route("POST /b/deployments/fixture-dep/restart", func(int) reply { return reply{Status: 403, Body: tc.body} })
+		r, _, _ := testRunner(b.client(), "", true)
+		r.rawDeployment = "fixture-dep"
+
+		var nm NotManagedError
+		err := r.deploymentOp(nil, "restart")
+		if got := errors.As(err, &nm); got != tc.want || err == nil {
+			t.Errorf("%s: got %v, NotManagedError is %v, want %v", name, err, got, tc.want)
+		}
+	}
+}

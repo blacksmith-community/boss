@@ -1,6 +1,6 @@
 //go:build ignore
 
-package apierr_test
+package deployments_test
 
 import (
 	"bytes"
@@ -11,13 +11,17 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"blacksmith/internal/apierr"
 )
 
+// TestZZFixtures asks the real ownership check to change a deployment
+// that no service instance of the broker owns.
 func TestZZFixtures(t *testing.T) {
+	handler, _ := ownershipHandler(managedVault())
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/b/deployments/fixture-dep/restart", nil)
 	rec := httptest.NewRecorder()
-	apierr.Write(rec, apierr.New(http.StatusForbidden, "deployment_not_managed", "deployment fixture-dep is not managed by this broker"), http.StatusInternalServerError)
+	handler.ServeHTTP(rec, req)
+
 	zzSave(t, "deployment_not_managed", "POST /b/deployments/fixture-dep/restart (not ours)", rec.Code, rec.Body.Bytes())
 }
 

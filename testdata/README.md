@@ -93,7 +93,7 @@ The file `params.json` and its twin `params.yml` are inputs that we hand to Boss
 
 - `deployment_not_managed.json`
 
-  The 403 a newer broker sends when a deployment action names a deployment it does not manage, built from the broker's own error writer.
+  The 403 a newer broker sends when a deployment action names a deployment it does not manage, recorded from the broker's ownership check in a handler test, which is why its message is the broker's real wording.
 
 - `*.txt`
 
