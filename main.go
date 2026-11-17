@@ -123,6 +123,17 @@ var opt struct {
 		} `cli:"preview"`
 	} `cli:"certificates, certs"`
 
+	Deployment struct {
+		Restart  struct{} `cli:"restart"`
+		Recreate struct{} `cli:"recreate"`
+		Stop     struct{} `cli:"stop"`
+		Start    struct{} `cli:"start"`
+		Errands  struct{} `cli:"errands"`
+		Errand   struct {
+			Instances []string `cli:"--instance"`
+		} `cli:"errand"`
+	} `cli:"deployment, deployments"`
+
 	Manifest struct{} `cli:"manifest"`
 
 	Creds struct{} `cli:"creds"`
@@ -270,6 +281,22 @@ func certificates_options() {
 	fmt.Printf("                           --converge pending|immediate\n")
 	fmt.Printf("\n")
 	fmt.Printf("Boss does not start a rotation yet.\n")
+	fmt.Printf("\n")
+}
+
+func deployment_options() {
+	fmt.Printf("Each subcommand takes a deployment name, or an instance ID.\n")
+	fmt.Printf("\n")
+	fmt.Printf("Subcommands:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  @G{deployment restart}   Restart the jobs on every VM, after asking.\n")
+	fmt.Printf("  @G{deployment recreate}  Recreate every VM, after asking.\n")
+	fmt.Printf("  @G{deployment stop}      Stop every VM, after asking.\n")
+	fmt.Printf("  @G{deployment start}     Start the VMs again, after asking.\n")
+	fmt.Printf("  @G{deployment errands}   List the errands of the deployment.\n")
+	fmt.Printf("  @G{deployment errand}    Run an errand, after asking.  The arguments are the\n")
+	fmt.Printf("                         deployment and the errand.  Option: --instance GROUP/ID\n")
+	fmt.Printf("                         (repeatable)\n")
 	fmt.Printf("\n")
 }
 
@@ -648,6 +675,26 @@ func main() {
 				mode = "redeploy"
 			}
 			finish(command, r.certPreview(args, p.Variables, mode, p.Converge))
+		}
+		os.Exit(0)
+
+	case "deployment", "deployment restart", "deployment recreate", "deployment stop", "deployment start",
+		"deployment errands", "deployment errand":
+		if opt.Help || command == "deployment" {
+			usage("@C{deployment} @M{restart|recreate|stop|start|errands|errand} [options]")
+			deployment_options()
+			options()
+			os.Exit(0)
+		}
+
+		r := newRunner(connect(), ctx)
+		switch command {
+		case "deployment errands":
+			finish(command, r.errands(args))
+		case "deployment errand":
+			finish(command, r.errand(args, opt.Deployment.Errand.Instances))
+		default:
+			finish(command, r.deploymentOp(args, strings.TrimPrefix(command, "deployment ")))
 		}
 		os.Exit(0)
 
