@@ -432,6 +432,9 @@ func connect(ctx context.Context) *Client {
 	}
 }
 
+// exit ends the process. A test replaces it.
+var exit = os.Exit
+
 // finish ends a command that failed. A command line the operator got wrong
 // prints the short hint, and anything else prints the error.
 func finish(command string, err error) {
@@ -442,11 +445,12 @@ func finish(command string, err error) {
 	var ue usageError
 	if errors.As(err, &ue) {
 		bad(command, "@R{%s}", ue.msg)
-		os.Exit(1)
+		exit(1)
+		return
 	}
 
 	_, _ = fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", err)
-	os.Exit(exitCode(err))
+	exit(exitCode(err))
 }
 
 func main() {
