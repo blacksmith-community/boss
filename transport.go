@@ -105,11 +105,21 @@ func (c Client) httpClient() *http.Client {
 	}
 }
 
+// logURL is the broker's base URL with the password of any userinfo
+// hidden, for debug output.
+func (c Client) logURL() string {
+	u, err := url.Parse(c.URL)
+	if err != nil {
+		return "[unparsable URL]"
+	}
+	return u.Redacted()
+}
+
 // buildURL joins the broker's base URL with a path that may carry a query.
 func (c Client) buildURL(path string) (string, error) {
 	u, err := url.Parse(strings.TrimSuffix(c.URL, "/"))
 	if err != nil {
-		return "", fmt.Errorf("invalid URL %s: %w", c.URL, err)
+		return "", fmt.Errorf("invalid URL %s: %w", c.logURL(), err)
 	}
 
 	rel, err := url.Parse(path)
@@ -284,11 +294,11 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 
 		body = bytes.NewBuffer(b)
 		if c.Debug {
-			_, _ = fmt.Fprintf(c.stderr(), "REQUEST: %s %s\n", method, c.URL+path)
+			_, _ = fmt.Fprintf(c.stderr(), "REQUEST: %s %s\n", method, c.logURL()+path)
 			_, _ = fmt.Fprintf(c.stderr(), "BODY: %s\n", requestLogBody(path, b))
 		}
 	} else if c.Debug {
-		_, _ = fmt.Fprintf(c.stderr(), "REQUEST: %s %s\n", method, c.URL+path)
+		_, _ = fmt.Fprintf(c.stderr(), "REQUEST: %s %s\n", method, c.logURL()+path)
 	}
 
 	target, err := c.buildURL(path)

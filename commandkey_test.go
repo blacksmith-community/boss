@@ -54,3 +54,21 @@ func TestTheCommandKeyCanComeFromAFile(t *testing.T) {
 		t.Error("a missing key file was not reported")
 	}
 }
+
+func TestDebugOutputHidesPasswordInTheURL(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	c := b.client()
+	c.URL = strings.Replace(b.srv.URL, "http://", "http://url-user:fixture-url-password@", 1)
+	var logged strings.Builder
+	c.Debug, c.Stderr = true, &logged
+
+	if _, err := c.statusIndex(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(logged.String(), "fixture-url-password") {
+		t.Errorf("the log shows the URL password:\n%s", logged.String())
+	}
+	if !strings.Contains(logged.String(), "REQUEST: GET") {
+		t.Errorf("no request line in:\n%s", logged.String())
+	}
+}
