@@ -462,12 +462,11 @@ func (c Client) provisionBody(service, plan string, params map[string]interface{
 func (c Client) Create(id, service, plan string, params map[string]interface{}) (Instance, error) {
 	in := c.provisionBody(service, plan, params)
 
-	var out acceptedOperation
-	_, err := c.request("PUT", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, &out)
+	_, body, err := c.rawRequest("PUT", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in)
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to create instance %s: %w", id, err)
 	}
-	return Instance{ID: id, Operation: out.Operation}, nil
+	return Instance{ID: id, Operation: operationOf(body)}, nil
 }
 
 // Update modifies an existing service instance with new parameters or a
@@ -493,8 +492,7 @@ func (c Client) Update(id, service, plan, previousPlan string, params map[string
 		in.Previous = &previous{ServiceID: service, PlanID: previousPlan}
 	}
 
-	var out acceptedOperation
-	_, err := c.request("PATCH", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, &out)
+	_, body, err := c.rawRequest("PATCH", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in)
 	var apiErr APIError
 	if errors.As(err, &apiErr) && apiErr.Status == 500 && strings.Contains(apiErr.Description, "not implemented") {
 		return Instance{}, fmt.Errorf("failed to update instance %s: this broker doesn't support updates yet", id)
@@ -502,7 +500,7 @@ func (c Client) Update(id, service, plan, previousPlan string, params map[string
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to update instance %s: %w", id, err)
 	}
-	return Instance{ID: id, Operation: out.Operation}, nil
+	return Instance{ID: id, Operation: operationOf(body)}, nil
 }
 
 // ErrInstanceGone is what Delete returns when the broker answers 410,
@@ -694,9 +692,18 @@ type OperationStatus struct {
 	Description string `json:"description"`
 }
 
-// acceptedOperation is the body of an OSB 202 answer.
-type acceptedOperation struct {
-	Operation string `json:"operation"`
+// operationOf reads the operation string from the body of an OSB 202
+// answer. A 202 means the broker accepted the work, so a body that is not
+// JSON, or an operation that is not a string, is read as no operation
+// and never as a failure.
+func operationOf(body []byte) string {
+	var out struct {
+		Operation string `json:"operation"`
+	}
+	if json.Unmarshal(body, &out) != nil {
+		return ""
+	}
+	return out.Operation
 }
 
 // OperationRef carries what the OSB specification asks a platform to send
