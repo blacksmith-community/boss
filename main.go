@@ -10,7 +10,6 @@ import (
 	fmt "github.com/jhunt/go-ansi"
 	"github.com/jhunt/go-cli"
 	env "github.com/jhunt/go-envirotron"
-	"github.com/jhunt/go-table"
 )
 
 var Version = "(dev)"
@@ -18,7 +17,7 @@ var Version = "(dev)"
 func bail(e error) {
 	if e != nil {
 		fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", asSent(e.Error()))
-		os.Exit(1)
+		exit(1)
 	}
 }
 
@@ -533,45 +532,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		if opt.List.Long {
-			t := table.NewTable("ID", "Service", "(ID)", "Plan", "(ID)")
-			for _, instance := range instances {
-				sid := "-"
-				sname := "(unknown)"
-				if instance.Service != nil {
-					sid = instance.Service.ID
-					sname = instance.Service.Name
-				}
-
-				pid := "-"
-				pname := "(unknown)"
-				if instance.Plan != nil {
-					pid = instance.Plan.ID
-					pname = instance.Plan.Name
-				}
-
-				t.Row(nil, cell(instance.ID), cell(sname), cell(sid), cell(pname), cell(pid))
-			}
-			t.Output(os.Stdout)
-
-		} else {
-			t := table.NewTable("ID", "Service", "Plan")
-			for _, instance := range instances {
-				sname := "(unknown)"
-				if instance.Service != nil {
-					sname = instance.Service.Name
-				}
-
-				pname := "(unknown)"
-				if instance.Plan != nil {
-					pname = instance.Plan.Name
-				}
-
-				t.Row(nil, cell(instance.ID), cell(sname), cell(pname))
-			}
-			t.Output(os.Stdout)
-
-		}
+		instancesTable(os.Stdout, instances, opt.List.Long)
 
 	case "catalog":
 		if opt.Help {
@@ -589,58 +550,7 @@ func main() {
 		c := connect(ctx)
 		catalog, err := c.Catalog()
 
-		if opt.Catalog.Long {
-			t := table.NewTable("Service", "(ID)", "Plans", "(IDs)", "Tags")
-			for _, s := range catalog.Services {
-
-				plans := ""
-				ids := ""
-				for _, p := range s.Plans {
-					plans += fmt.Sprintf("%s\n", p.Name)
-					ids += fmt.Sprintf("%s\n", p.ID)
-				}
-				if plans == "" {
-					plans = "(none)"
-				}
-
-				tags := ""
-				for _, t := range s.Tags {
-					tags += fmt.Sprintf("%s\n", t)
-				}
-				if tags == "" {
-					tags = "(none)"
-				}
-
-				t.Row(nil, cell(s.Name), cell(s.ID), cell(plans), cell(ids), cell(tags))
-				t.Row(nil, "", "", "", "", "")
-			}
-			t.Output(os.Stdout)
-
-		} else {
-			t := table.NewTable("Service", "Plans", "Tags")
-			for _, s := range catalog.Services {
-
-				plans := ""
-				for _, p := range s.Plans {
-					plans += fmt.Sprintf("%s\n", p.Name)
-				}
-				if plans == "" {
-					plans = "(none)"
-				}
-
-				tags := ""
-				for _, t := range s.Tags {
-					tags += fmt.Sprintf("%s\n", t)
-				}
-				if tags == "" {
-					tags = "(none)"
-				}
-
-				t.Row(nil, cell(s.Name), cell(plans), cell(tags))
-				t.Row(nil, "", "", "")
-			}
-			t.Output(os.Stdout)
-		}
+		catalogTable(os.Stdout, catalog, opt.Catalog.Long)
 		bail(err)
 		os.Exit(0)
 

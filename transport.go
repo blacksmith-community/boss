@@ -783,7 +783,7 @@ func asSent(s string) string {
 // cell cleans text for one table cell, which is one line, so a newline or a
 // tab becomes a space as well.
 func cell(s string) string {
-	return strings.Join(strings.Fields(asSent(strings.NewReplacer("\n", " ", "\t", " ").Replace(s))), " ")
+	return strings.NewReplacer("\n", " ", "\t", " ").Replace(asSent(s))
 }
 
 const valueWithheld = "(value withheld)"
