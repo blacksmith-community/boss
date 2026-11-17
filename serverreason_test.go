@@ -487,3 +487,101 @@ func TestAnEnumeratedFieldPrintsOnlyTheValuesTheBrokerSends(t *testing.T) {
 		}
 	})
 }
+
+func sameSet(t *testing.T, name string, got map[string]bool, want []string) {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, w := range want {
+		seen[w] = true
+		if !got[w] {
+			t.Errorf("%s lost %q", name, w)
+		}
+	}
+	for g := range got {
+		if !seen[g] {
+			t.Errorf("%s gained %q", name, g)
+		}
+	}
+}
+
+func TestTheCodeListsMatchTheBrokerExactly(t *testing.T) {
+	sameSet(t, "brokerErrorCodes", brokerErrorCodes, []string{
+		"AsyncRequired",
+		"ConcurrencyError",
+		"HTTPError",
+		"MaintenanceInfoConflict",
+		"RequiresApp",
+	})
+	sameSet(t, "brokerCodes", brokerCodes, []string{
+		"E007",
+		"E008",
+		"approval_mismatch",
+		"candidate_invalid",
+		"cf_auth_failed",
+		"cf_not_cloud_foundry",
+		"cf_tls_failed",
+		"cf_unreachable",
+		"cleanup_not_started",
+		"command_credential_required",
+		"command_too_long",
+		"commands_disabled",
+		"credhub_not_configured",
+		"credhub_unavailable",
+		"deployment_locked",
+		"deployment_not_managed",
+		"director_unavailable",
+		"director_unsupported",
+		"instance_busy",
+		"instance_not_found",
+		"internal_error",
+		"invalid_filter",
+		"invalid_mode",
+		"invalid_request",
+		"invalid_run_user",
+		"invalid_settings",
+		"invalid_task_state",
+		"inventory_disabled",
+		"max_in_flight_too_high",
+		"no_health_gate",
+		"no_selections",
+		"not_awaiting_decision",
+		"not_found",
+		"not_rotatable",
+		"outcome_unknown",
+		"patch_disabled",
+		"patch_unsupported",
+		"preview_bound",
+		"preview_expired",
+		"preview_mismatch",
+		"request_id_conflict",
+		"root_disabled",
+		"rotation_disabled",
+		"signing_ca_changed",
+		"ssh_disabled",
+		"tasks_loading",
+		"timeout_out_of_range",
+		"unknown_variable",
+		"unsupported_media_type",
+		"upgrade_preview_required",
+		"vault_unavailable",
+		"vms_not_running",
+	})
+	sameSet(t, "findingCodes", findingCodes, []string{
+		"chain_broken",
+		"deploy_pending",
+		"issuer_expires_first",
+		"patch_reverted",
+		"pinned_ca_mismatch",
+		"probe_failed",
+		"san_mismatch",
+		"served_mismatch",
+		"services_ca_drift",
+		"signing_ca_changed",
+		"unconverged",
+		"weak_key",
+		"weak_signature",
+	})
+	if got := strings.Join(severityValues, ","); got != "error,warning,info" {
+		t.Errorf("severityValues is %s", got)
+	}
+}
