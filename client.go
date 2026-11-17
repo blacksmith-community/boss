@@ -644,10 +644,35 @@ func (c Client) Redeploy(id string, restart bool) (ActionResult, error) {
 
 	var out ActionResult
 	_, err := c.long().request("POST", instancePath(id, "/"+action), nil, &out)
+
+	// A broker without the instance routes refused before it did
+	// anything, so the same work can go through the deployment routes.
+	var old BrokerTooOldError
+	if errors.As(err, &old) {
+		return c.redeployThroughTheDeployment(id, action)
+	}
 	if err != nil {
 		return out, fmt.Errorf("failed to %s %s: %w", action, id, err)
 	}
 	return out, nil
+}
+
+// redeployThroughTheDeployment does a redeploy with the deployment routes
+// that older brokers have, using the deployment name from /b/status.
+func (c Client) redeployThroughTheDeployment(id, action string) (ActionResult, error) {
+	ref, err := c.Lookup(id)
+	if err != nil {
+		return ActionResult{}, err
+	}
+	if ref.DeploymentName == "" {
+		return ActionResult{}, fmt.Errorf("the broker lists no deployment for instance %s", id)
+	}
+
+	res, err := c.DeploymentOp(ref.DeploymentName, action)
+	if err != nil {
+		return ActionResult{}, err
+	}
+	return ActionResult{InstanceID: id, Deployment: res.Deployment, Operation: res.Operation, TaskID: res.TaskID, State: res.State}, nil
 }
 
 // waitForOperation polls for operation completion

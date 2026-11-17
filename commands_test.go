@@ -247,6 +247,44 @@ func TestRedeployRestartUsesTheRestartRoute(t *testing.T) {
 	}
 }
 
+func TestRedeployFallsBackToTheDeploymentRoutesOnAnOldBroker(t *testing.T) {
+	for _, action := range []string{"recreate", "restart"} {
+		b := newBroker(t, map[string]string{"GET /b/status": "v182_status.json"})
+		b.route("POST /b/"+fixtureID+"/"+action, func(int) reply {
+			return reply{Status: 404, File: "v182_instance_action_not_found.txt", ContentType: "text/plain; charset=utf-8"}
+		})
+		b.status("POST /b/deployments/redis-small-11111111/"+action, 200, "v182_deployment_"+action+".json")
+		r, out, _ := testRunner(b.client(), "", true)
+
+		if err := r.redeploy([]string{fixtureID}, action == "restart"); err != nil {
+			t.Fatalf("%s: %v", action, err)
+		}
+		posts := only(b.requests(), "POST")
+		if len(posts) != 2 || posts[1].Path != "/b/deployments/redis-small-11111111/"+action {
+			t.Fatalf("%s posts: %+v", action, posts)
+		}
+		if !strings.Contains(out.String(), "BOSH task 5201") {
+			t.Errorf("%s output: %s", action, out)
+		}
+	}
+}
+
+func TestRedeployOnAnOldBrokerWithNoDeploymentRoutesSaysSo(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "v182_status.json"})
+	b.route("POST /b/"+fixtureID+"/recreate", func(int) reply {
+		return reply{Status: 404, File: "v182_instance_action_not_found.txt", ContentType: "text/plain"}
+	})
+	b.route("POST /b/deployments/redis-small-11111111/recreate", func(int) reply {
+		return reply{Status: 404, File: "v182_endpoint_not_found.txt", ContentType: "text/plain"}
+	})
+	r, _, _ := testRunner(b.client(), "", true)
+
+	var old BrokerTooOldError
+	if err := r.redeploy([]string{fixtureID}, false); !errors.As(err, &old) {
+		t.Fatalf("got %v, want a BrokerTooOldError", err)
+	}
+}
+
 func TestRedeployAsksFirstAndHonorsNo(t *testing.T) {
 	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
 	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
