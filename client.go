@@ -30,7 +30,7 @@ type APIError struct {
 func (e APIError) Error() string {
 	msg := e.Code
 	if e.Description != "" {
-		msg = fmt.Sprintf("%s: %s", e.Code, e.Description)
+		msg = fmt.Sprintf("%s: %s", e.Code, shownReason(e.Description))
 	}
 	if e.BrokerCode != "" {
 		msg += " (" + e.BrokerCode + ")"
@@ -376,7 +376,7 @@ func (c Client) Log(opts LogOptions) (string, error) {
 		return "", fmt.Errorf("failed to get log: %w", err)
 	}
 	if msg, ok := out.Error.(string); ok && msg != "" {
-		return "", fmt.Errorf("failed to get log: %s", msg)
+		return "", fmt.Errorf("failed to get log: %s", shownReason(msg))
 	}
 	return out.Logs, nil
 }
@@ -557,7 +557,7 @@ func (e TaskEvent) String() string {
 		line += " " + e.State
 	}
 	if e.Error != nil {
-		line += fmt.Sprintf(" (error %d: %s)", e.Error.Code, e.Error.Message)
+		line += fmt.Sprintf(" (error %d: %s)", e.Error.Code, shownReason(e.Error.Message))
 	}
 	return line
 }
@@ -589,7 +589,7 @@ func (c Client) Manifest(id string) (string, error) {
 		if msg == "" {
 			msg = "the broker returned no manifest"
 		}
-		return "", fmt.Errorf("failed to get manifest for %s: %s", id, msg)
+		return "", fmt.Errorf("failed to get manifest for %s: %s", id, shownReason(msg))
 	}
 
 	if err := c.validateYAML(out.Text); err != nil {

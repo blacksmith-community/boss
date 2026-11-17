@@ -178,7 +178,9 @@ func TestLogReportsAnErrorTheBrokerSendsWith200(t *testing.T) {
 	r, _, _ := testRunner(b.client(), "", true)
 
 	err := r.log(nil, LogOptions{})
-	if err == nil || !strings.Contains(err.Error(), "unauthorized log file access") {
+	// The broker's reason holds the word "auth", so the reason rule
+	// withholds it, and the operator still learns that the read failed.
+	if err == nil || !strings.Contains(err.Error(), "failed to get log: "+reasonWithheld) {
 		t.Fatalf("got %v", err)
 	}
 }

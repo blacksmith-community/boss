@@ -13,7 +13,7 @@ func (c Client) Resurrection(id string, enabled bool) (string, error) {
 	if _, err := c.request("PUT", instancePath(id, "/resurrection"), in, &out); err != nil {
 		return "", fmt.Errorf("failed to set resurrection for %s: %w", id, err)
 	}
-	return out.Message, nil
+	return shownReason(out.Message), nil
 }
 
 // ResetResurrection removes the resurrection setting Blacksmith made, so
@@ -25,5 +25,5 @@ func (c Client) ResetResurrection(id string) (string, error) {
 	if _, err := c.request("DELETE", instancePath(id, "/resurrection"), nil, &out); err != nil {
 		return "", fmt.Errorf("failed to reset resurrection for %s: %w", id, err)
 	}
-	return out.Message, nil
+	return shownReason(out.Message), nil
 }

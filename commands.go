@@ -155,7 +155,7 @@ func (r *runner) operationProgress(id string, ref OperationRef) pollFunc {
 		case "succeeded":
 			return true, nil
 		case "failed":
-			return true, fmt.Errorf("the operation failed: %s", op.Description)
+			return true, fmt.Errorf("the operation failed: %s", shownReason(op.Description))
 		}
 		return true, fmt.Errorf("the broker reported the unknown state %q for the operation", op.State)
 	}}
@@ -178,7 +178,7 @@ func (r *runner) taskProgress(taskID int) pollFunc {
 				why = task.Result
 			}
 			if why != "" {
-				why = ": " + why
+				why = ": " + shownReason(why)
 			}
 			return true, fmt.Errorf("BOSH task %d ended as %s%s", taskID, task.State, why)
 		}

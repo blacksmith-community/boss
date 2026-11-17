@@ -1,0 +1,93 @@
+package main
+
+import (
+	"errors"
+	"strings"
+	"testing"
+)
+
+const leakyText = "bad token=hunter2"
+
+// leaks reports whether the text shows the secret instead of the fixed
+// sentence.
+func leaks(s string) bool { return strings.Contains(s, "hunter2") }
+
+func TestServerMessagesPassThroughTheReasonRule(t *testing.T) {
+	body := `{"success":false,"message":"` + leakyText + `","error":"` + leakyText + `","text":""}`
+
+	t.Run("resurrection", func(t *testing.T) {
+		b := newBroker(t, nil)
+		b.route("PUT /b/fixture-id/resurrection", func(int) reply { return reply{Status: 200, Body: body} })
+		b.route("DELETE /b/fixture-id/resurrection", func(int) reply { return reply{Status: 200, Body: body} })
+		for name, call := range map[string]func() (string, error){
+			"set":   func() (string, error) { return b.client().Resurrection("fixture-id", true) },
+			"reset": func() (string, error) { return b.client().ResetResurrection("fixture-id") },
+		} {
+			got, err := call()
+			if err != nil || leaks(got) || got != reasonWithheld {
+				t.Errorf("%s: got %q, %v", name, got, err)
+			}
+		}
+	})
+
+	t.Run("batch action", func(t *testing.T) {
+		b := newBroker(t, nil)
+		b.route("POST /b/upgrade/tasks/fixture-job/pause", func(int) reply { return reply{Status: 200, Body: body} })
+		got, err := b.client().BatchAction("fixture-job", "pause")
+		if err != nil || leaks(got) || got != reasonWithheld {
+			t.Errorf("got %q, %v", got, err)
+		}
+	})
+
+	t.Run("task cancel", func(t *testing.T) {
+		b := newBroker(t, nil)
+		b.route("POST /b/tasks/7/cancel", func(int) reply { return reply{Status: 200, Body: body} })
+		r, out, _ := testRunner(b.client(), "", true)
+		if err := r.tasksCancel([]string{"7"}, false); err != nil {
+			t.Fatal(err)
+		}
+		if leaks(out.String()) || !strings.Contains(out.String(), reasonWithheld) {
+			t.Errorf("output %q", out)
+		}
+	})
+
+	t.Run("log and manifest errors", func(t *testing.T) {
+		b := newBroker(t, nil)
+		b.route("GET /b/blacksmith/logs", func(int) reply { return reply{Status: 200, Body: body} })
+		b.route("GET /b/fixture-id/manifest", func(int) reply { return reply{Status: 200, Body: body} })
+		_, err := b.client().Log(LogOptions{})
+		if err == nil || leaks(err.Error()) {
+			t.Errorf("log error %v", err)
+		}
+		_, err = b.client().Manifest("fixture-id")
+		if err == nil || leaks(err.Error()) {
+			t.Errorf("manifest error %v", err)
+		}
+	})
+
+	t.Run("monitor", func(t *testing.T) {
+		b := newBroker(t, nil)
+		b.route("GET /b/bosh/vm-monitor", func(int) reply {
+			return reply{Status: 200, Body: `{"running":false,"error":"` + leakyText + `"}`}
+		})
+		r, out, _ := testRunner(b.client(), "", true)
+		if err := r.monitor(nil); err != nil {
+			t.Fatal(err)
+		}
+		if leaks(out.String()) {
+			t.Errorf("output %q", out)
+		}
+	})
+}
+
+func TestAnAPIErrorDescriptionPassesThroughTheReasonRule(t *testing.T) {
+	msg := APIError{Code: "bad", Description: leakyText}.Error()
+	if leaks(msg) || !strings.Contains(msg, reasonWithheld) {
+		t.Errorf("got %q", msg)
+	}
+	var e error = APIError{Code: "bad", Description: "the plan is unknown", Status: 400}
+	var api APIError
+	if !errors.As(e, &api) || !strings.Contains(e.Error(), "the plan is unknown") {
+		t.Errorf("an ordinary description must show: %q", e)
+	}
+}

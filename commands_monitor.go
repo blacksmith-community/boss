@@ -28,7 +28,7 @@ func (r *runner) monitor(args []string) error {
 		if reason == "" {
 			reason = "it is not running"
 		}
-		r.printf("The VM monitor is not running: %s.\n", reason)
+		r.printf("The VM monitor is not running: %s.\n", shownReason(reason))
 		return nil
 	}
 
@@ -69,7 +69,7 @@ func (r *runner) orphans(args []string) error {
 			if e.Due {
 				left = "due now"
 			}
-			rows = append(rows, []string{e.InstanceID, e.DeploymentName, e.Reason, strconv.Itoa(e.CheckCount), left})
+			rows = append(rows, []string{e.InstanceID, e.DeploymentName, shownReason(e.Reason), strconv.Itoa(e.CheckCount), left})
 		}
 		r.table([]string{"Instance", "Deployment", "Reason", "Checks", "Removal in"}, rows)
 		r.printf("\nThe broker removes an orphan after %s.\n", (time.Duration(o.RemovalAfterSeconds) * time.Second).String())

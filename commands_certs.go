@@ -107,7 +107,7 @@ func (r *runner) certShow(args []string) error {
 	r.printf("Owners:    %s\n", certOwners(c.Certificate))
 	r.printf("Rotation:  allowed=%t modes=%s\n", c.Rotation.Allowed, strings.Join(c.Rotation.Modes, ","))
 	for _, f := range c.Findings {
-		r.printf("Finding:   [%s] %s: %s\n", f.Severity, f.Code, f.Message)
+		r.printf("Finding:   [%s] %s: %s\n", f.Severity, f.Code, shownReason(f.Message))
 	}
 	return nil
 }
@@ -205,11 +205,11 @@ func (r *runner) certPreview(args, variables []string, mode, converge string) er
 			r.printf("  impact: %s\n", i.Impact)
 		}
 		if i.Blocked != nil {
-			r.printf("  BLOCKED [%s]: %s\n", i.Blocked.Code, i.Blocked.Message)
+			r.printf("  BLOCKED [%s]: %s\n", i.Blocked.Code, shownReason(i.Blocked.Message))
 		}
 	}
 	for _, w := range p.Warnings {
-		r.printf("\nWarning: %s\n", w)
+		r.printf("\nWarning: %s\n", shownReason(w))
 	}
 	return nil
 }

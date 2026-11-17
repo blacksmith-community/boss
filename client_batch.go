@@ -123,5 +123,5 @@ func (c Client) BatchAction(id, action string) (string, error) {
 	if _, err := c.request("POST", batchPath(id, "/"+action), nil, &out); err != nil {
 		return "", fmt.Errorf("failed to %s batch job %s: %w", action, id, err)
 	}
-	return out.Message, nil
+	return shownReason(out.Message), nil
 }

@@ -64,7 +64,7 @@ func (r *runner) tasksList(args []string, f TaskFilter) error {
 
 		for _, t := range list.Tasks {
 			if t.Error != "" {
-				r.printf("\nTask %d failed: %s\n", t.ID, t.Error)
+				r.printf("\nTask %d failed: %s\n", t.ID, shownReason(t.Error))
 			}
 		}
 	}
@@ -118,7 +118,7 @@ func (r *runner) tasksCancel(args []string, force bool) error {
 		return err
 	}
 
-	r.printf("%s\n", res.Message)
+	r.printf("%s\n", shownReason(res.Message))
 	return nil
 }
 
@@ -185,7 +185,7 @@ func (r *runner) batchShow(args []string) error {
 	r.printf("Kind:    %s\n", batchKind(j.Kind))
 	r.printf("Status:  %s\n", state)
 	if j.PauseReason != "" {
-		r.printf("Paused:  %s\n", j.PauseReason)
+		r.printf("Paused:  %s\n", shownReason(j.PauseReason))
 	}
 	r.printf("Target:  %s\n", j.target())
 	r.printf("Counts:  %d total, %d completed, %d failed, %d unknown, %d skipped, %d cancelled\n",
@@ -202,7 +202,7 @@ func (r *runner) batchShow(args []string) error {
 		if i.BOSHTaskID > 0 {
 			task = strconv.Itoa(i.BOSHTaskID)
 		}
-		rows = append(rows, []string{i.InstanceID, i.DeploymentName, i.Status, task, i.Error})
+		rows = append(rows, []string{i.InstanceID, i.DeploymentName, i.Status, task, shownReason(i.Error)})
 	}
 	r.table([]string{"Instance", "Deployment", "Status", "BOSH task", "Error"}, rows)
 	return nil

@@ -679,6 +679,14 @@ var riskyWords = []string{"pass", "pw", "pwd", "secret", "token", "key", "auth",
 // a letter outside ASCII, or any risky word, which over-withholds and is meant to. The second
 // result says whether the reason was withheld. A reason that is shown
 // is on one line and cut at 512 runes.
+// shownReason is the text of a reason the server gave, or the fixed
+// sentence when it may hold a secret. Every place that prints server text
+// as a reason goes through it.
+func shownReason(s string) string {
+	shown, _ := reasonText(s)
+	return shown
+}
+
 func reasonText(s string) (string, bool) {
 	spaced := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
