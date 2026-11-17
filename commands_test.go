@@ -1,0 +1,325 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+)
+
+const (
+	fixtureID  = "11111111-aaaa-bbbb-cccc-000000000001"
+	fixtureID2 = "11111111-aaaa-bbbb-cccc-000000000002"
+)
+
+func TestTaskReadsTheTaskLogRoute(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                     "status.json",
+		"GET /b/" + fixtureID + "/task/log": "task_log.json",
+	})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.task([]string{"11111111-aaaa-bbbb-cccc-000000000001"}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	for _, want := range []string{"# " + fixtureID, "Preparing deployment started", "Creating missing vms: standalone/aaaaaaaa (0) failed", "fixture failure"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output lacks %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestTaskResolvesAnIDPrefix(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                     "status.json",
+		"GET /b/" + fixtureID + "/task/log": "task_log.json",
+	})
+	r, _, _ := testRunner(b.client(), "", true)
+
+	b.status("GET /b/22222222-aaaa-bbbb-cccc-000000000003/task/log", 200, "task_log.json")
+	if err := r.task([]string{"22222222"}, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestResolveRefusesAnAmbiguousPrefix(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+
+	_, err := b.client().Resolve("11111111")
+	if err == nil || !strings.Contains(err.Error(), "matches 2 instances") {
+		t.Fatalf("want an ambiguity error, got %v", err)
+	}
+}
+
+func TestTaskWithoutEventsSaysSo(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.route("GET /b/"+fixtureID+"/task/log", func(int) reply { return reply{Status: 200, Body: "[]"} })
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.task([]string{fixtureID}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "No task events yet.") {
+		t.Errorf("output: %s", out)
+	}
+}
+
+func TestTaskFollowPrintsOnlyNewEvents(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.route("GET /b/"+fixtureID+"/task/log", func(n int) reply {
+		if n == 1 {
+			return reply{Status: 200, File: "task_log_start.json"}
+		}
+		return reply{Status: 200, File: "task_log_more.json"}
+	})
+	r, out, _ := testRunner(b.client(), "", true)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	r.ctx = ctx
+
+	if err := r.task([]string{fixtureID}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	if n := strings.Count(got, "Preparing deployment started"); n != 1 {
+		t.Errorf("first event printed %d times:\n%s", n, got)
+	}
+	if !strings.Contains(got, "Creating missing vms: standalone/aaaaaaaa (0) finished") {
+		t.Errorf("a later event is missing:\n%s", got)
+	}
+}
+
+func TestManifestReadsTheManifestRoute(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                     "status.json",
+		"GET /b/" + fixtureID + "/manifest": "manifest.json",
+	})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.manifest([]string{fixtureID}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "instance_groups:") || !strings.Contains(out.String(), "# "+fixtureID) {
+		t.Errorf("output: %s", out)
+	}
+}
+
+func TestManifestReportsTheBrokersReason(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                     "status.json",
+		"GET /b/" + fixtureID + "/manifest": "manifest_missing.json",
+	})
+	r, _, _ := testRunner(b.client(), "", true)
+
+	err := r.manifest([]string{fixtureID})
+	if err == nil || !strings.Contains(err.Error(), "Director not configured") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestCredsReadsTheCredentialsRoute(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                        "status.json",
+		"GET /b/" + fixtureID + "/credentials": "credentials.json",
+	})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.creds([]string{fixtureID}); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"host: 10.255.0.10", "port: 6379", "password: fixture-not-a-secret"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestCredsSurfacesABrokerErrorBody(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                        "status.json",
+		"GET /b/" + fixtureID + "/credentials": "credentials_error.json",
+	})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	err := r.creds([]string{fixtureID})
+	if err == nil || !strings.Contains(err.Error(), "fixture vault failure") {
+		t.Fatalf("got %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("printed output on error: %s", out)
+	}
+}
+
+func TestLogReadsTheBrokerLogRoute(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/blacksmith/logs": "logs.json"})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.log(nil, LogOptions{File: "/var/vcap/sys/log/blacksmith/blacksmith.stderr.log", Limit: 50, Offset: 5}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out.String(), "line two of the fixture log") {
+		t.Errorf("output: %s", out)
+	}
+	got := b.requests()[0].Path
+	for _, want := range []string{"file=%2Fvar%2Fvcap%2Fsys%2Flog%2Fblacksmith%2Fblacksmith.stderr.log", "limit=50", "offset=5"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("request %s lacks %s", got, want)
+		}
+	}
+}
+
+func TestLogReportsAnErrorTheBrokerSendsWith200(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/blacksmith/logs": "logs_denied.json"})
+	r, _, _ := testRunner(b.client(), "", true)
+
+	err := r.log(nil, LogOptions{})
+	if err == nil || !strings.Contains(err.Error(), "unauthorized log file access") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestRedeployRecreatesByDefault(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.redeploy([]string{fixtureID}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	posts := only(b.requests(), "POST")
+	if len(posts) != 1 || posts[0].Path != "/b/"+fixtureID+"/recreate" {
+		t.Fatalf("posts: %+v", posts)
+	}
+	if !strings.Contains(out.String(), "BOSH task 4242") {
+		t.Errorf("output: %s", out)
+	}
+}
+
+func TestRedeployRestartUsesTheRestartRoute(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.status("POST /b/"+fixtureID+"/restart", 202, "action_restart.json")
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.redeploy([]string{fixtureID}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	posts := only(b.requests(), "POST")
+	if len(posts) != 1 || posts[0].Path != "/b/"+fixtureID+"/restart" {
+		t.Fatalf("posts: %+v", posts)
+	}
+	if !strings.Contains(out.String(), "BOSH task 4243") {
+		t.Errorf("output: %s", out)
+	}
+}
+
+func TestRedeployAsksFirstAndHonorsNo(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
+	r, _, errb := testRunner(b.client(), "n\n", false)
+
+	err := r.redeploy([]string{fixtureID}, false)
+	if !errors.Is(err, errAborted) {
+		t.Fatalf("got %v, want errAborted", err)
+	}
+	if len(only(b.requests(), "POST")) != 0 {
+		t.Error("a POST went out after the operator said no")
+	}
+	if !strings.Contains(errb.String(), "Recreate the VMs of instance "+fixtureID) {
+		t.Errorf("prompt: %s", errb)
+	}
+}
+
+func TestRedeployProceedsOnYes(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
+	r, _, _ := testRunner(b.client(), "yes\n", false)
+
+	if err := r.redeploy([]string{fixtureID}, false); err != nil {
+		t.Fatal(err)
+	}
+	if len(only(b.requests(), "POST")) != 1 {
+		t.Error("expected one POST")
+	}
+}
+
+func TestRedeployReportsALockedDeployment(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
+	b.status("POST /b/"+fixtureID+"/recreate", 409, "action_locked.json")
+	r, _, _ := testRunner(b.client(), "", true)
+
+	err := r.redeploy([]string{fixtureID}, false)
+	if err == nil || !strings.Contains(err.Error(), "running task 4100") || !strings.Contains(err.Error(), "deployment_locked") {
+		t.Fatalf("got %v", err)
+	}
+	if len(only(b.requests(), "POST")) != 1 {
+		t.Error("a refused POST must not be sent again")
+	}
+}
+
+func TestCommandsDemandAnInstance(t *testing.T) {
+	r, _, _ := testRunner(&Client{}, "", true)
+
+	for name, err := range map[string]error{
+		"task":     r.task(nil, false),
+		"manifest": r.manifest(nil),
+		"creds":    r.creds(nil),
+		"redeploy": r.redeploy(nil, false),
+		"log":      r.log([]string{"x"}, LogOptions{}),
+	} {
+		var ue usageError
+		if !errors.As(err, &ue) {
+			t.Errorf("%s: got %v, want a usage error", name, err)
+		}
+	}
+}
+
+func TestDebugAndTraceNeverShowCredentials(t *testing.T) {
+	b := newBroker(t, map[string]string{
+		"GET /b/status":                        "status.json",
+		"GET /b/" + fixtureID + "/credentials": "credentials.json",
+		"GET /b/" + fixtureID + "/manifest":    "manifest.json",
+	})
+	c := b.client()
+	var logged bytes.Buffer
+	c.Debug, c.Trace, c.Stderr = true, true, &logged
+	c.CommandKey = "fixture-command-key"
+	r, _, _ := testRunner(c, "", true)
+
+	if err := r.creds([]string{fixtureID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.manifest([]string{fixtureID}); err != nil {
+		t.Fatal(err)
+	}
+
+	got := logged.String()
+	for _, secret := range []string{"fixture-not-a-secret", "fixture-pass", "fixture-command-key", "Zml4dHVyZS11c2VyOmZpeHR1cmUtcGFzcw"} {
+		if strings.Contains(got, secret) {
+			t.Errorf("the log shows %q:\n%s", secret, got)
+		}
+	}
+	if !strings.Contains(got, "[redacted]") {
+		t.Errorf("expected redaction markers in:\n%s", got)
+	}
+}
+
+func TestQueryStringSurvivesOnOSBCalls(t *testing.T) {
+	b := newBroker(t, map[string]string{})
+	b.status("DELETE /v2/service_instances/"+fixtureID, 200, "")
+	b.route("DELETE /v2/service_instances/"+fixtureID, func(int) reply { return reply{Status: 200, Body: "{}"} })
+
+	if err := b.client().Delete(fixtureID); err != nil {
+		t.Fatal(err)
+	}
+	if got := b.requests()[0].Path; got != "/v2/service_instances/"+fixtureID+"?accepts_incomplete=true" {
+		t.Errorf("path: %s", got)
+	}
+}

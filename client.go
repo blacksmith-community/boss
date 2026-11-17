@@ -1,14 +1,9 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"sort"
@@ -24,13 +19,20 @@ type APIError struct {
 	Code        string `json:"error"`
 	Description string `json:"description"`
 	ErrorCode   string `json:"error_code,omitempty"`
+	// BrokerCode is the short machine code the /b/ routes send, such as
+	// deployment_locked. Their error field holds the message.
+	BrokerCode string `json:"code,omitempty"`
 }
 
 func (e APIError) Error() string {
+	msg := e.Code
 	if e.Description != "" {
-		return fmt.Sprintf("%s: %s", e.Code, e.Description)
+		msg = fmt.Sprintf("%s: %s", e.Code, e.Description)
 	}
-	return e.Code
+	if e.BrokerCode != "" {
+		msg += " (" + e.BrokerCode + ")"
+	}
+	return msg
 }
 
 // IsNotFound returns true if the error indicates a resource was not found
@@ -79,9 +81,44 @@ type Client struct {
 	MaxRetries int
 	// BrokerAPIVersion sets the X-Broker-API-Version header (default: 2.16)
 	BrokerAPIVersion string
+	// Org is the organization_guid sent when provisioning (default: boss)
+	Org string
+	// Space is the space_guid sent when provisioning (default: boss)
+	Space string
+	// Stderr receives debug and trace output (default: os.Stderr)
+	Stderr io.Writer
+	// CommandKey is the second credential a broker asks for before it
+	// shows or resumes a batch command job
+	CommandKey string
+}
 
-	// ua is the internal HTTP client
-	ua *http.Client
+func (c Client) stderr() io.Writer {
+	if c.Stderr == nil {
+		return os.Stderr
+	}
+	return c.Stderr
+}
+
+// defaultOrgSpace is the organization and space Boss has always sent.
+const defaultOrgSpace = "boss"
+
+func (c Client) org() string {
+	if c.Org == "" {
+		return defaultOrgSpace
+	}
+	return c.Org
+}
+
+func (c Client) space() string {
+	if c.Space == "" {
+		return defaultOrgSpace
+	}
+	return c.Space
+}
+
+// instancePath builds /b/{id}{suffix} with the id escaped as one segment.
+func instancePath(id, suffix string) string {
+	return "/b/" + url.PathEscape(id) + suffix
 }
 
 // Plan represents a service plan in the Blacksmith catalog
@@ -144,220 +181,6 @@ type Instance struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
 
-func (c Client) do(method, path string, in interface{}) (*http.Response, error) {
-	if c.ua == nil {
-		timeout := c.Timeout
-		if timeout == 0 {
-			timeout = 30 * time.Second
-		}
-		c.ua = &http.Client{
-			Timeout: timeout,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					// #nosec G402 -- InsecureSkipVerify is a configurable option for development environments
-					// and connecting to services with self-signed certificates. User must explicitly enable it.
-					InsecureSkipVerify: c.InsecureSkipVerify,
-				},
-				Proxy: http.ProxyFromEnvironment,
-			},
-		}
-		c.URL = strings.TrimSuffix(c.URL, "/")
-	}
-
-	return c.doWithRetry(method, path, in)
-}
-
-// doWithRetry performs the request with retry logic
-func (c Client) doWithRetry(method, path string, in interface{}) (*http.Response, error) {
-	maxRetries := c.MaxRetries
-	if maxRetries == 0 {
-		maxRetries = 3
-	}
-
-	var lastErr error
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Exponential backoff
-			backoff := time.Duration(attempt*attempt) * time.Second
-			if c.Debug {
-				fmt.Fprintf(os.Stderr, "Retrying request after %s (attempt %d/%d)\n", backoff, attempt+1, maxRetries+1)
-			}
-			time.Sleep(backoff)
-		}
-
-		res, err := c.doSingle(method, path, in)
-		if err == nil {
-			return res, nil
-		}
-
-		lastErr = err
-
-		// Don't retry certain errors
-		if !c.shouldRetry(err) {
-			break
-		}
-	}
-
-	return nil, fmt.Errorf("request failed after %d attempts: %w", maxRetries+1, lastErr)
-}
-
-// shouldRetry determines if an error is retryable
-func (c Client) shouldRetry(err error) bool {
-	// Don't retry client errors (4xx)
-	if apiErr, ok := err.(APIError); ok {
-		return apiErr.Status >= 500 // Only retry server errors
-	}
-
-	// Retry network errors
-	if strings.Contains(err.Error(), "connection refused") ||
-		strings.Contains(err.Error(), "timeout") ||
-		strings.Contains(err.Error(), "temporary failure") {
-		return true
-	}
-
-	return false
-}
-
-// doSingle performs a single HTTP request
-func (c Client) doSingle(method, path string, in interface{}) (*http.Response, error) {
-
-	var body io.Reader = nil
-	if in != nil {
-		b, err := json.Marshal(in)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request: %w", err)
-		}
-
-		body = bytes.NewBuffer(b)
-		if c.Debug {
-			fmt.Fprintf(os.Stderr, "REQUEST: %s %s\n", method, c.URL+path)
-			fmt.Fprintf(os.Stderr, "BODY: %s\n", string(b))
-		}
-	}
-
-	// Build URL properly
-	u, err := url.Parse(c.URL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid URL %s: %w", c.URL, err)
-	}
-	u.Path = path
-
-	req, err := http.NewRequest(method, u.String(), body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set API version header for v2 endpoints
-	if strings.HasPrefix(path, "/v2/") {
-		version := c.BrokerAPIVersion
-		if version == "" {
-			version = "2.16"
-		}
-		req.Header.Set("X-Broker-API-Version", version)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.SetBasicAuth(c.Username, c.Password)
-
-	if c.Trace {
-		b, err := httputil.DumpRequestOut(req, true)
-		if err == nil {
-			fmt.Fprintf(os.Stderr, "=================================\n")
-			fmt.Fprintf(os.Stderr, "%s\n\n", string(b))
-		}
-	}
-
-	res, err := c.ua.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-
-	if c.Trace {
-		b, err := httputil.DumpResponse(res, true)
-		if err == nil {
-			fmt.Fprintf(os.Stderr, "=================================\n")
-			fmt.Fprintf(os.Stderr, "%s\n\n", string(b))
-		}
-	}
-
-	return res, nil
-}
-
-func (c Client) request(method, path string, in, out interface{}) (int, error) {
-	res, err := c.do(method, path, in)
-	if err != nil {
-		return 0, fmt.Errorf("request failed: %w", err)
-	}
-
-	defer res.Body.Close()
-
-	// Read response body
-	b, err := io.ReadAll(res.Body)
-	if err != nil {
-		return res.StatusCode, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if c.Debug {
-		fmt.Fprintf(os.Stderr, "RESPONSE: %d\n", res.StatusCode)
-		fmt.Fprintf(os.Stderr, "BODY: %s\n", string(b))
-	}
-
-	// Parse response if output provided
-	if out != nil && len(b) > 0 {
-		if err := json.Unmarshal(b, out); err != nil {
-			return res.StatusCode, fmt.Errorf("failed to parse response: %w", err)
-		}
-	}
-
-	if method == "DELETE" && res.StatusCode == 410 {
-		/* this is okay - already deleted */
-		return res.StatusCode, nil
-	}
-
-	// Check for error response
-	if res.StatusCode >= 400 {
-		var apiErr APIError
-		if json.Unmarshal(b, &apiErr) == nil && apiErr.Code != "" {
-			apiErr.Status = res.StatusCode
-			return res.StatusCode, apiErr
-		}
-
-		// Fallback for non-JSON error responses
-		apiErr = APIError{
-			Status:      res.StatusCode,
-			Code:        "HTTPError",
-			Description: fmt.Sprintf("HTTP %d: %s", res.StatusCode, res.Status),
-		}
-		if len(b) > 0 {
-			apiErr.Description += " - " + string(b)
-		}
-		return res.StatusCode, apiErr
-	}
-
-	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return res.StatusCode, fmt.Errorf("unexpected status %d: %s", res.StatusCode, res.Status)
-	}
-
-	return res.StatusCode, nil
-}
-
-func (c Client) text(path string, args ...interface{}) (string, error) {
-	res, err := c.do("GET", fmt.Sprintf(path, args...), nil)
-	if err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		return "", fmt.Errorf("unexpected status %d: %s", res.StatusCode, res.Status)
-	}
-	b, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-	return string(b), nil
-}
-
 // Catalog retrieves the service catalog from the Blacksmith broker.
 // It returns a Catalog struct containing all available services and plans.
 // The endpoint requires X-Broker-API-Version header which is automatically added.
@@ -379,41 +202,146 @@ func (c Client) Plan(service, plan string) (*Service, *Plan, error) {
 	return cat.Plan(service, plan)
 }
 
-func (c Client) Resolve(want string) (string, error) {
-	var out struct {
-		Instances map[string]struct{} `json:"instances"`
+// InstanceRef is what /b/status records about one service instance.
+type InstanceRef struct {
+	ID             string
+	ServiceID      string
+	PlanID         string
+	DeploymentName string
+	InstanceName   string
+}
+
+// statusEntry is one instance of the /b/status index. The broker adds more
+// fields than Boss reads.
+type statusEntry struct {
+	ServiceID      string      `json:"service_id"`
+	PlanID         string      `json:"plan_id"`
+	DeploymentName string      `json:"deployment_name"`
+	InstanceName   string      `json:"instance_name"`
+	State          string      `json:"state"`
+	Status         string      `json:"status"`
+	CreatedAt      string      `json:"created_at"`
+	Created        json.Number `json:"created"`
+	UpdatedAt      string      `json:"updated_at"`
+}
+
+func (e statusEntry) state() string {
+	if e.State != "" {
+		return e.State
 	}
-	_, err := c.request("GET", "/b/status", nil, &out)
+	return e.Status
+}
+
+func (e statusEntry) createdTime() time.Time {
+	if t, err := time.Parse(time.RFC3339, e.CreatedAt); err == nil {
+		return t
+	}
+	if n, err := e.Created.Int64(); err == nil && n > 0 {
+		return time.Unix(n, 0).UTC()
+	}
+	return time.Time{}
+}
+
+func (e statusEntry) updatedTime() time.Time {
+	if t, err := time.Parse(time.RFC3339, e.UpdatedAt); err == nil {
+		return t
+	}
+	return time.Time{}
+}
+
+// statusIndex fetches the instance index from /b/status.
+func (c Client) statusIndex() (map[string]statusEntry, error) {
+	var out struct {
+		Instances map[string]statusEntry `json:"instances"`
+	}
+	if _, err := c.request("GET", "/b/status", nil, &out); err != nil {
+		return nil, fmt.Errorf("failed to get status: %w", err)
+	}
+	return out.Instances, nil
+}
+
+// Lookup finds an instance by exact ID or by an unambiguous prefix.
+func (c Client) Lookup(want string) (InstanceRef, error) {
+	index, err := c.statusIndex()
 	if err != nil {
-		return "", fmt.Errorf("failed to get status: %w", err)
+		return InstanceRef{}, err
+	}
+
+	pick := func(id string, e statusEntry) InstanceRef {
+		return InstanceRef{ID: id, ServiceID: e.ServiceID, PlanID: e.PlanID,
+			DeploymentName: e.DeploymentName, InstanceName: e.InstanceName}
 	}
 
 	// Exact match first
-	for id := range out.Instances {
-		if id == want {
-			return id, nil
-		}
+	if e, ok := index[want]; ok {
+		return pick(want, e), nil
 	}
 
 	// Prefix match second
-	for id := range out.Instances {
-		if strings.HasPrefix(id, want) {
-			return id, nil
+	var matches []string
+	for id := range index {
+		if want != "" && strings.HasPrefix(id, want) {
+			matches = append(matches, id)
 		}
 	}
+	sort.Strings(matches)
 
-	return "", fmt.Errorf("no instance found matching '%s'", want)
+	switch len(matches) {
+	case 0:
+		return InstanceRef{}, fmt.Errorf("no instance found matching '%s'", want)
+	case 1:
+		return pick(matches[0], index[matches[0]]), nil
+	default:
+		return InstanceRef{}, fmt.Errorf("'%s' matches %d instances (%s); use more of the ID",
+			want, len(matches), strings.Join(matches, ", "))
+	}
 }
 
-func (c Client) Log() (string, error) {
-	var out struct {
-		Log string `json:"log"`
-	}
-	_, err := c.request("GET", "/b/status", nil, &out)
+// Resolve turns an ID or a unique ID prefix into the full instance ID.
+func (c Client) Resolve(want string) (string, error) {
+	ref, err := c.Lookup(want)
 	if err != nil {
+		return "", err
+	}
+	return ref.ID, nil
+}
+
+// LogOptions picks which broker log file to read and how much of it.
+type LogOptions struct {
+	File   string
+	Limit  int
+	Offset int
+}
+
+// Log reads the Blacksmith broker's own log from /b/blacksmith/logs.
+func (c Client) Log(opts LogOptions) (string, error) {
+	q := url.Values{}
+	if opts.File != "" {
+		q.Set("file", opts.File)
+	}
+	if opts.Limit > 0 {
+		q.Set("limit", fmt.Sprint(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		q.Set("offset", fmt.Sprint(opts.Offset))
+	}
+
+	path := "/b/blacksmith/logs"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+
+	var out struct {
+		Logs  string      `json:"logs"`
+		Error interface{} `json:"error"`
+	}
+	if _, err := c.request("GET", path, nil, &out); err != nil {
 		return "", fmt.Errorf("failed to get log: %w", err)
 	}
-	return out.Log, nil
+	if msg, ok := out.Error.(string); ok && msg != "" {
+		return "", fmt.Errorf("failed to get log: %s", msg)
+	}
+	return out.Logs, nil
 }
 
 // Instances retrieves all service instances from the Blacksmith broker.
@@ -425,31 +353,20 @@ func (c Client) Instances() ([]Instance, error) {
 		return nil, fmt.Errorf("failed to get catalog: %w", err)
 	}
 
-	var status struct {
-		Instances map[string]struct {
-			PlanID     string    `json:"plan_id"`
-			ServiceID  string    `json:"service_id"`
-			State      string    `json:"state,omitempty"`
-			CreatedAt  time.Time `json:"created_at,omitempty"`
-			UpdatedAt  time.Time `json:"updated_at,omitempty"`
-			LastTaskID string    `json:"last_task_id,omitempty"`
-		} `json:"instances"`
-		Log string `json:"log"`
-	}
-	_, err = c.request("GET", "/b/status", nil, &status)
+	index, err := c.statusIndex()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance status: %w", err)
 	}
 
-	instances := make([]Instance, 0, len(status.Instances))
-	for id, info := range status.Instances {
+	instances := make([]Instance, 0, len(index))
+	for id, info := range index {
 		service, plan, _ := cat.Plan(info.ServiceID, info.PlanID)
 
 		instance := Instance{
 			ID:        id,
-			State:     info.State,
-			CreatedAt: info.CreatedAt,
-			UpdatedAt: info.UpdatedAt,
+			State:     info.state(),
+			CreatedAt: info.createdTime(),
+			UpdatedAt: info.updatedTime(),
 		}
 
 		if service != nil && plan != nil {
@@ -458,7 +375,7 @@ func (c Client) Instances() ([]Instance, error) {
 		} else {
 			// Log warning for unknown service/plan
 			if c.Debug {
-				fmt.Fprintf(os.Stderr, "WARNING: Unknown service/plan for instance %s: %s/%s\n",
+				_, _ = fmt.Fprintf(c.stderr(), "WARNING: Unknown service/plan for instance %s: %s/%s\n",
 					id, info.ServiceID, info.PlanID)
 			}
 		}
@@ -484,11 +401,9 @@ func (c Client) Instances() ([]Instance, error) {
 	return instances, nil
 }
 
-// Create provisions a new service instance with the specified ID, service, plan, and parameters.
-// This method supports asynchronous operations and will add the accepts_incomplete=true parameter.
-// Returns an Instance struct with the ID, or an error if the operation fails.
-func (c Client) Create(id, service, plan string, params map[string]interface{}) (Instance, error) {
-	in := struct {
+// provisionBody builds the OSB provision request.
+func (c Client) provisionBody(service, plan string, params map[string]interface{}) interface{} {
+	return struct {
 		ServiceID  string                 `json:"service_id"`
 		PlanID     string                 `json:"plan_id"`
 		OrgID      string                 `json:"organization_guid"`
@@ -498,12 +413,19 @@ func (c Client) Create(id, service, plan string, params map[string]interface{}) 
 	}{
 		ServiceID:  service,
 		PlanID:     plan,
-		OrgID:      "boss",
-		SpaceID:    "boss",
+		OrgID:      c.org(),
+		SpaceID:    c.space(),
 		Parameters: params,
 	}
+}
 
-	_, err := c.request("PUT", "/v2/service_instances/"+id+"?accepts_incomplete=true", in, nil)
+// Create provisions a new service instance with the specified ID, service, plan, and parameters.
+// This method supports asynchronous operations and will add the accepts_incomplete=true parameter.
+// Returns an Instance struct with the ID, or an error if the operation fails.
+func (c Client) Create(id, service, plan string, params map[string]interface{}) (Instance, error) {
+	in := c.provisionBody(service, plan, params)
+
+	_, err := c.request("PUT", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, nil)
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to create instance %s: %w", id, err)
 	}
@@ -512,19 +434,18 @@ func (c Client) Create(id, service, plan string, params map[string]interface{}) 
 
 // Update modifies an existing service instance with new service, plan, or parameters.
 // This method supports asynchronous operations and will add the accepts_incomplete=true parameter.
-// Note: This method was fixed in v2.0 to properly use the service parameter instead of hardcoding "service".
 func (c Client) Update(id, service, plan string, params map[string]interface{}) (Instance, error) {
 	in := struct {
 		ServiceID  string                 `json:"service_id"`
 		PlanID     string                 `json:"plan_id,omitempty"`
 		Parameters map[string]interface{} `json:"parameters,omitempty"`
 	}{
-		ServiceID:  service, // FIXED: was hardcoded as "service"
+		ServiceID:  service,
 		PlanID:     plan,
 		Parameters: params,
 	}
 
-	_, err := c.request("PATCH", "/v2/service_instances/"+id+"?accepts_incomplete=true", in, nil)
+	_, err := c.request("PATCH", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, nil)
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to update instance %s: %w", id, err)
 	}
@@ -535,76 +456,83 @@ func (c Client) Update(id, service, plan string, params map[string]interface{}) 
 // This method supports asynchronous operations and will add the accepts_incomplete=true parameter.
 // Returns an error if the deletion fails, or nil if successful.
 func (c Client) Delete(id string) error {
-	_, err := c.request("DELETE", "/v2/service_instances/"+id+"?accepts_incomplete=true", nil, nil)
+	_, err := c.request("DELETE", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", nil, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete instance %s: %w", id, err)
 	}
 	return nil
 }
 
-// Task retrieves the BOSH deployment task log for a service instance.
-// Returns the complete task log as a string, or an error if the operation fails.
-func (c Client) Task(id string) (string, error) {
-	task, err := c.text("/b/%s/task.log", id)
-	if err != nil {
-		return "", fmt.Errorf("failed to get task log for %s: %w", id, err)
-	}
-	return task, nil
+// TaskEvent is one line of a BOSH task as the broker reports it.
+type TaskEvent struct {
+	Time     time.Time              `json:"time"`
+	Stage    string                 `json:"stage"`
+	Tags     []string               `json:"tags"`
+	Total    int                    `json:"total"`
+	Task     string                 `json:"task"`
+	Index    int                    `json:"index"`
+	State    string                 `json:"state"`
+	Progress int                    `json:"progress"`
+	Data     map[string]interface{} `json:"data"`
+	Error    *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
 }
 
-// StreamTask streams task logs, optionally following the log
-func (c Client) StreamTask(id string, follow bool) error {
-	path := fmt.Sprintf("/b/%s/task.log", id)
-	if follow {
-		path += "?follow=true"
+// String renders the event as one line of text.
+func (e TaskEvent) String() string {
+	line := e.Time.UTC().Format("15:04:05")
+	if e.Stage != "" {
+		line += " | " + e.Stage
 	}
+	if e.Task != "" {
+		line += ": " + e.Task
+	}
+	if e.State != "" {
+		line += " " + e.State
+	}
+	if e.Error != nil {
+		line += fmt.Sprintf(" (error %d: %s)", e.Error.Code, e.Error.Message)
+	}
+	return line
+}
 
-	u, err := url.Parse(c.URL)
+// TaskEvents retrieves the events of the latest deployment task of a
+// service instance from /b/{id}/task/log.
+func (c Client) TaskEvents(id string) ([]TaskEvent, error) {
+	var events []TaskEvent
+	_, err := c.request("GET", instancePath(id, "/task/log"), nil, &events)
 	if err != nil {
-		return fmt.Errorf("invalid URL %s: %w", c.URL, err)
+		return nil, fmt.Errorf("failed to get task log for %s: %w", id, err)
 	}
-	u.Path = path
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.SetBasicAuth(c.Username, c.Password)
-
-	resp, err := c.ua.Do(req)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
-	}
-
-	// Stream output
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		fmt.Println(scanner.Text())
-	}
-
-	return scanner.Err()
+	return events, nil
 }
 
 // Manifest retrieves the BOSH deployment manifest for a service instance.
-// The returned YAML is automatically validated for syntax errors.
-// Returns the manifest as a string, or an error if invalid or not found.
+// The returned YAML is validated for syntax errors.
 func (c Client) Manifest(id string) (string, error) {
-	manifest, err := c.text("/b/%s/manifest.yml", id)
+	var out struct {
+		Text  string `json:"text"`
+		Error string `json:"error"`
+	}
+	_, err := c.request("GET", instancePath(id, "/manifest"), nil, &out)
 	if err != nil {
 		return "", fmt.Errorf("failed to get manifest for %s: %w", id, err)
 	}
+	if out.Text == "" {
+		msg := out.Error
+		if msg == "" {
+			msg = "the broker returned no manifest"
+		}
+		return "", fmt.Errorf("failed to get manifest for %s: %s", id, msg)
+	}
 
-	// Validate YAML
-	if err := c.validateYAML(manifest); err != nil {
+	if err := c.validateYAML(out.Text); err != nil {
 		return "", fmt.Errorf("invalid manifest for %s: %w", id, err)
 	}
 
-	return manifest, nil
+	return out.Text, nil
 }
 
 // validateYAML checks if the content is valid YAML
@@ -616,54 +544,51 @@ func (c Client) validateYAML(content string) error {
 	return nil
 }
 
-// Creds retrieves the service credentials for a service instance as YAML.
-// The returned YAML is automatically validated for syntax errors.
-// Returns the credentials as a YAML string, or an error if invalid or not found.
+// Creds retrieves the service credentials of an instance from
+// /b/{id}/credentials and returns them as YAML.
 func (c Client) Creds(id string) (string, error) {
-	credsYAML, err := c.text("/b/%s/creds.yml", id)
+	var creds map[string]interface{}
+	_, err := c.request("GET", instancePath(id, "/credentials"), nil, &creds)
 	if err != nil {
 		return "", fmt.Errorf("failed to get credentials for %s: %w", id, err)
 	}
 
-	// Validate YAML
-	if err := c.validateYAML(credsYAML); err != nil {
-		return "", fmt.Errorf("invalid credentials YAML for %s: %w", id, err)
+	// The broker answers 200 with only an error key when Vault fails.
+	if msg, ok := creds["error"].(string); ok && len(creds) == 1 {
+		return "", fmt.Errorf("failed to get credentials for %s: %s", id, msg)
 	}
 
-	return credsYAML, nil
+	b, err := yaml.Marshal(creds)
+	if err != nil {
+		return "", fmt.Errorf("failed to format credentials for %s: %w", id, err)
+	}
+	return string(b), nil
 }
 
-// CredsMap returns credentials as a map for easier programmatic access
-func (c Client) CredsMap(id string) (map[string]interface{}, error) {
-	credsYAML, err := c.Creds(id)
-	if err != nil {
-		return nil, err
-	}
-
-	var creds map[string]interface{}
-	if err := yaml.Unmarshal([]byte(credsYAML), &creds); err != nil {
-		return nil, fmt.Errorf("failed to parse credentials: %w", err)
-	}
-
-	// Validate required fields (log warnings only)
-	requiredFields := []string{"hostname", "port", "username", "password"}
-	for _, field := range requiredFields {
-		if _, ok := creds[field]; !ok {
-			if c.Debug {
-				fmt.Fprintf(os.Stderr, "WARNING: Missing credential field: %s\n", field)
-			}
-		}
-	}
-
-	return creds, nil
+// ActionResult is the broker's answer to a lifecycle request. It names the
+// BOSH task the director queued.
+type ActionResult struct {
+	InstanceID string `json:"instance_id"`
+	Deployment string `json:"deployment"`
+	Operation  string `json:"operation"`
+	TaskID     int    `json:"task_id"`
+	State      string `json:"state"`
 }
 
-func (c Client) Redeploy(id string) (string, error) {
-	result, err := c.text("/b/%s/redeploy", id)
-	if err != nil {
-		return "", fmt.Errorf("failed to redeploy %s: %w", id, err)
+// Redeploy recreates the VMs of an instance with POST /b/{id}/recreate, or
+// restarts their jobs with POST /b/{id}/restart when restart is true.
+func (c Client) Redeploy(id string, restart bool) (ActionResult, error) {
+	action := "recreate"
+	if restart {
+		action = "restart"
 	}
-	return result, nil
+
+	var out ActionResult
+	_, err := c.request("POST", instancePath(id, "/"+action), nil, &out)
+	if err != nil {
+		return out, fmt.Errorf("failed to %s %s: %w", action, id, err)
+	}
+	return out, nil
 }
 
 // waitForOperation polls for operation completion
@@ -683,9 +608,9 @@ func (c Client) waitForOperation(instanceID, operationID string, timeout time.Du
 			Description string `json:"description"`
 		}
 
-		path := fmt.Sprintf("/v2/service_instances/%s/last_operation", instanceID)
+		path := fmt.Sprintf("/v2/service_instances/%s/last_operation", url.PathEscape(instanceID))
 		if operationID != "" {
-			path += "?operation=" + operationID
+			path += "?operation=" + url.QueryEscape(operationID)
 		}
 
 		_, err := c.request("GET", path, nil, &status)
@@ -700,7 +625,7 @@ func (c Client) waitForOperation(instanceID, operationID string, timeout time.Du
 			return fmt.Errorf("operation failed: %s", status.Description)
 		case "in progress":
 			if c.Debug {
-				fmt.Fprintf(os.Stderr, "Operation in progress: %s\n", status.Description)
+				_, _ = fmt.Fprintf(c.stderr(), "Operation in progress: %s\n", status.Description)
 			}
 		default:
 			return fmt.Errorf("unknown operation state: %s", status.State)
@@ -716,27 +641,14 @@ func (c Client) waitForOperation(instanceID, operationID string, timeout time.Du
 
 // CreateAndWait creates an instance and waits for completion
 func (c Client) CreateAndWait(id, service, plan string, params map[string]interface{}, timeout time.Duration) (Instance, error) {
-	in := struct {
-		ServiceID  string                 `json:"service_id"`
-		PlanID     string                 `json:"plan_id"`
-		OrgID      string                 `json:"organization_guid"`
-		SpaceID    string                 `json:"space_guid"`
-		Parameters map[string]interface{} `json:"parameters,omitempty"`
-		Context    map[string]interface{} `json:"context,omitempty"`
-	}{
-		ServiceID:  service,
-		PlanID:     plan,
-		OrgID:      "boss",
-		SpaceID:    "boss",
-		Parameters: params,
-	}
+	in := c.provisionBody(service, plan, params)
 
 	var response struct {
 		Operation string `json:"operation,omitempty"`
 	}
 
 	status, err := c.request("PUT",
-		fmt.Sprintf("/v2/service_instances/%s?accepts_incomplete=true", id),
+		fmt.Sprintf("/v2/service_instances/%s?accepts_incomplete=true", url.PathEscape(id)),
 		in, &response)
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to create instance: %w", err)
@@ -745,7 +657,7 @@ func (c Client) CreateAndWait(id, service, plan string, params map[string]interf
 	// Handle async creation
 	if status == 202 && response.Operation != "" {
 		if c.Debug {
-			fmt.Fprintf(os.Stderr, "Instance creation started, operation: %s\n", response.Operation)
+			_, _ = fmt.Fprintf(c.stderr(), "Instance creation started, operation: %s\n", response.Operation)
 		}
 
 		// Wait for operation to complete

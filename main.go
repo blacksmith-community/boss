@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"os"
+	"os/signal"
 	"strings"
-	"time"
 
 	fmt "github.com/jhunt/go-ansi"
 	"github.com/jhunt/go-cli"
@@ -32,7 +34,13 @@ var opt struct {
 	Username          string `cli:"-u, --username" env:"BLACKSMITH_USERNAME"`
 	Password          string `cli:"-p, --password" env:"BLACKSMITH_PASSWORD"`
 
-	Log struct{} `cli:"log, logs"`
+	Yes bool `cli:"-y, --yes"`
+
+	Log struct {
+		File   string `cli:"--file"`
+		Limit  int    `cli:"--limit"`
+		Offset int    `cli:"--offset"`
+	} `cli:"log, logs"`
 
 	List struct {
 		Long bool `cli:"-l, --long"`
@@ -61,7 +69,9 @@ var opt struct {
 
 	Creds struct{} `cli:"creds"`
 
-	Redeploy struct{} `cli:"redeploy"`
+	Redeploy struct {
+		Restart bool `cli:"--restart"`
+	} `cli:"redeploy"`
 }
 
 func usage(f string, args ...interface{}) {
@@ -85,7 +95,7 @@ func commands() {
 	fmt.Printf("\n")
 	fmt.Printf("  @G{creds}     Print out credentials for a service instance.\n")
 	fmt.Printf("  @G{manifest}  Print an instance's BOSH deployment manifest.\n")
-	fmt.Printf("  @G{redeploy}  Redeploy service instance from saved deployment manifest\n")
+	fmt.Printf("  @G{redeploy}  Recreate the VMs of an instance, or restart its jobs.\n")
 	fmt.Printf("  @G{task}      Show the BOSH deployment task for an instance.\n")
 	fmt.Printf("\n")
 }
@@ -97,6 +107,8 @@ func options() {
 	fmt.Printf("\n")
 	fmt.Printf("  -h, --help      Show options and usage.  Can be set on a\n")
 	fmt.Printf("                  per-command basis for more help.\n")
+	fmt.Printf("\n")
+	fmt.Printf("  -y, --yes       Do not ask before a command changes anything.\n")
 	fmt.Printf("\n")
 	fmt.Printf("  -D, --debug     Enable debugging output.\n")
 	fmt.Printf("  -T, --trace     Trace HTTP(s) calls.  Implies --debug.\n")
@@ -145,6 +157,28 @@ func task_options() {
 	fmt.Printf("\n")
 }
 
+func log_options() {
+	fmt.Printf("Command Options:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  --file PATH     Read one of the broker's allowed log files\n")
+	fmt.Printf("                  (default is blacksmith.stdout.log)\n")
+	fmt.Printf("  --limit N       Show at most N lines\n")
+	fmt.Printf("  --offset N      Skip the first N lines\n")
+	fmt.Printf("\n")
+}
+
+func redeploy_options() {
+	fmt.Printf("Redeploying asks the broker to change the instance's BOSH deployment.\n")
+	fmt.Printf("By default it @W{recreates} every VM (POST /b/INSTANCE/recreate).\n")
+	fmt.Printf("With @W{--restart} it only restarts the jobs on the VMs instead\n")
+	fmt.Printf("(POST /b/INSTANCE/restart).  It asks first unless @W{--yes} is given.\n")
+	fmt.Printf("\n")
+	fmt.Printf("Command Options:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  --restart       Restart the jobs, instead of recreating the VMs\n")
+	fmt.Printf("\n")
+}
+
 func bad(command, msg string, args ...interface{}) {
 	fmt.Printf(msg+"\n", args...)
 	if command == "" {
@@ -165,7 +199,27 @@ func connect() *Client {
 	}
 }
 
+// finish ends a command that failed. A command line the operator got wrong
+// prints the short hint, and anything else prints the error.
+func finish(command string, err error) {
+	if err == nil {
+		return
+	}
+
+	var ue usageError
+	if errors.As(err, &ue) {
+		bad(command, "@R{%s}", ue.msg)
+		os.Exit(1)
+	}
+
+	fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", err)
+	os.Exit(1)
+}
+
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	env.Override(&opt)
 	command, args, err := cli.Parse(&opt)
 	bail(err)
@@ -201,21 +255,15 @@ func main() {
 
 	case "log":
 		if opt.Help {
-			usage("@C{log}")
+			usage("@C{log} [command_options]|[options]")
+			log_options()
 			options()
 			os.Exit(0)
 		}
 
-		if len(args) != 0 {
-			bad("log", "@R{The log command takes no arguments.}")
-			os.Exit(1)
-		}
-
-		c := connect()
-		log, err := c.Log()
-		bail(err)
-
-		fmt.Printf("%s\n", log)
+		finish("log", newRunner(connect(), ctx).log(args, LogOptions{
+			File: opt.Log.File, Limit: opt.Log.Limit, Offset: opt.Log.Offset,
+		}))
 		os.Exit(0)
 
 	case "list":
@@ -382,7 +430,7 @@ func main() {
 		fmt.Printf("@G{%s}/@Y{%s} instance @M{%s} created.\n", l[0], l[1], id)
 		if opt.Create.Follow {
 			fmt.Printf("\n@B{tailing deployment task log...}\n")
-			if err := c.StreamTask(id, true); err != nil {
+			if err := newRunner(c, ctx).followEvents(id, 0); err != nil {
 				fmt.Fprintf(os.Stderr, "Error streaming task logs: %v\n", err)
 			}
 		}
@@ -418,7 +466,7 @@ func main() {
 		fmt.Printf("Service instance @M{%s} updating.\n", id)
 		if opt.Update.Follow {
 			fmt.Printf("\n@B{tailing deployment task log...}\n")
-			if err := c.StreamTask(id, true); err != nil {
+			if err := newRunner(c, ctx).followEvents(id, 0); err != nil {
 				fmt.Fprintf(os.Stderr, "Error streaming task logs: %v\n", err)
 			}
 		}
@@ -450,34 +498,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		if len(args) != 1 {
-			bad("task", "@R{The `instance' argument is required.}")
-			os.Exit(1)
-		}
-
-		c := connect()
-		id, err := c.Resolve(args[0])
-		bail(err)
-		task, err := c.Task(id)
-		bail(err)
-		fmt.Printf("# @M{%s}\n", id)
-		fmt.Printf("%s", task)
-
-		if opt.Task.Follow {
-			for {
-				time.Sleep(time.Second)
-
-				t, err := c.Task(id)
-				bail(err)
-
-				if len(t) > len(task) {
-					fmt.Printf("%s", t[len(task):])
-					task = t
-				}
-			}
-		}
-
-		fmt.Printf("\n")
+		finish("task", newRunner(connect(), ctx).task(args, opt.Task.Follow))
 		os.Exit(0)
 
 	case "manifest":
@@ -487,39 +508,18 @@ func main() {
 			os.Exit(0)
 		}
 
-		if len(args) != 1 {
-			bad("manifest", "@R{The `instance' argument is required.}")
-			os.Exit(1)
-		}
-
-		c := connect()
-		id, err := c.Resolve(args[0])
-		bail(err)
-		creds, err := c.Manifest(id)
-		bail(err)
-		fmt.Printf("# @M{%s}\n", id)
-		fmt.Printf("%s\n", creds)
+		finish("manifest", newRunner(connect(), ctx).manifest(args))
 		os.Exit(0)
 
 	case "redeploy":
 		if opt.Help {
-			usage("@C{redeploy} @M{instance}")
+			usage("@C{redeploy} @M{instance} [command_options]|[options]")
+			redeploy_options()
 			options()
 			os.Exit(0)
 		}
 
-		if len(args) != 1 {
-			bad("manifest", "@R{The `instance' argument is required.}")
-			os.Exit(1)
-		}
-
-		c := connect()
-		id, err := c.Resolve(args[0])
-		bail(err)
-		task, err := c.Redeploy(id)
-		bail(err)
-		fmt.Printf("# @M{%s}\n", id)
-		fmt.Printf("%s\n", task)
+		finish("redeploy", newRunner(connect(), ctx).redeploy(args, opt.Redeploy.Restart))
 		os.Exit(0)
 
 	case "creds":
@@ -529,18 +529,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		if len(args) != 1 {
-			bad("creds", "@R{The `instance' argument is required.}")
-			os.Exit(1)
-		}
-
-		c := connect()
-		id, err := c.Resolve(args[0])
-		bail(err)
-		creds, err := c.Creds(id)
-		bail(err)
-		fmt.Printf("# @M{%s}\n", id)
-		fmt.Printf("%s\n", creds)
+		finish("creds", newRunner(connect(), ctx).creds(args))
 		os.Exit(0)
 	}
 }

@@ -1,0 +1,16 @@
+{
+  "services": [
+    {
+      "id": "redis",
+      "name": "redis",
+      "description": "A fixture Redis service",
+      "bindable": true,
+      "tags": ["blacksmith", "dedicated"],
+      "plan_updateable": true,
+      "plans": [
+        {"id": "redis-small", "name": "small", "description": "Small fixture plan"},
+        {"id": "redis-large", "name": "large", "description": "Large fixture plan"}
+      ]
+    }
+  ]
+}

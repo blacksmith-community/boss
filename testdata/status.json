@@ -1,0 +1,32 @@
+{
+  "healthy": true,
+  "bosh": "connected",
+  "vault": "connected",
+  "environment": "fixture-env",
+  "env": "fixture-env",
+  "version": "0.0.0-fixture",
+  "commit": "0000000",
+  "timestamp": 1790000000,
+  "instances": {
+    "11111111-aaaa-bbbb-cccc-000000000001": {
+      "service_id": "redis",
+      "plan_id": "redis-small",
+      "deployment_name": "small-11111111-aaaa-bbbb-cccc-000000000001",
+      "instance_name": "fixture-one",
+      "created_at": "2026-11-01T10:00:00Z"
+    },
+    "11111111-aaaa-bbbb-cccc-000000000002": {
+      "service_id": "redis",
+      "plan_id": "redis-large",
+      "deployment_name": "large-11111111-aaaa-bbbb-cccc-000000000002",
+      "instance_name": "fixture-two",
+      "created": 1790000100
+    },
+    "22222222-aaaa-bbbb-cccc-000000000003": {
+      "service_id": "redis",
+      "plan_id": "redis-small",
+      "deployment_name": "small-22222222-aaaa-bbbb-cccc-000000000003"
+    }
+  },
+  "plans": {}
+}

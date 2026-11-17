@@ -1,0 +1,6 @@
+[
+  {"time": "2026-11-01T10:00:01Z", "stage": "Preparing deployment", "tags": [], "total": 1, "task": "Preparing deployment", "index": 1, "state": "started", "progress": 0, "data": {}},
+  {"time": "2026-11-01T10:00:03Z", "stage": "Preparing deployment", "tags": [], "total": 1, "task": "Preparing deployment", "index": 1, "state": "finished", "progress": 100, "data": {}},
+  {"time": "2026-11-01T10:00:04Z", "stage": "Creating missing vms", "tags": [], "total": 1, "task": "standalone/aaaaaaaa (0)", "index": 1, "state": "started", "progress": 0, "data": {}},
+  {"time": "2026-11-01T10:01:04Z", "stage": "Creating missing vms", "tags": [], "total": 1, "task": "standalone/aaaaaaaa (0)", "index": 1, "state": "finished", "progress": 100, "data": {}}
+]
