@@ -620,7 +620,7 @@ func (c Client) Creds(id string) (string, error) {
 
 	// The broker answers 200 with only an error key when Vault fails.
 	if msg, ok := creds["error"].(string); ok && len(creds) == 1 {
-		return "", fmt.Errorf("failed to get credentials for %s: %s", id, msg)
+		return "", fmt.Errorf("failed to get credentials for %s: %s", id, shownReason(msg))
 	}
 
 	// Brokers before the fix answer 200 with a stand-in when they hold no

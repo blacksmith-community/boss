@@ -380,3 +380,12 @@ func TestOnlyAListedCodePrintsForAFindingOrABlockedPreview(t *testing.T) {
 		t.Errorf("preview output %q", got)
 	}
 }
+
+func TestCredsErrorBodyAndStatusTextPassThroughTheReasonRule(t *testing.T) {
+	b := newBroker(t, nil)
+	b.route("GET /b/fixture-id/credentials", func(int) reply { return reply{Status: 200, Body: `{"error":"` + leakyText + `"}`} })
+	_, err := b.client().Creds("fixture-id")
+	if err == nil || leaks(err.Error()) || !strings.Contains(err.Error(), reasonWithheld) {
+		t.Errorf("got %v", err)
+	}
+}

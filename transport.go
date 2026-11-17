@@ -555,7 +555,7 @@ func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, er
 	}
 
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return res.StatusCode, b, fmt.Errorf("unexpected status %d: %s", res.StatusCode, res.Status)
+		return res.StatusCode, b, fmt.Errorf("unexpected status %d: %s", res.StatusCode, http.StatusText(res.StatusCode))
 	}
 
 	return res.StatusCode, b, nil
@@ -818,6 +818,8 @@ var fixedBrokerReasons = map[string]bool{
 	"credentials are not available because Vault is not configured":             true,
 	"credentials are not available because Vault did not answer":                true,
 	"credentials are not available because nothing is stored for this instance": true,
+	// internal/handlers/services/handler.go, as of v1.8.2
+	"Failed to fetch credentials: vault unavailable": true,
 	// internal/upgrade/command_authz.go
 	"This broker needs a valid command key in the X-Blacksmith-Command-Key header before it previews or runs a command.": true,
 	// internal/certinventory/service.go
