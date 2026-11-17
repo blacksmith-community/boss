@@ -89,7 +89,11 @@ func eventKey(e TaskEvent) string {
 // pollFunc reads the real state of an operation. It answers done once the
 // operation has ended, with an error when it ended badly. An error with
 // done false means the state could not be read, which also stops a follow.
-type pollFunc func() (done bool, err error)
+type pollFunc struct {
+	read func() (done bool, err error)
+	// what names the work for the message a timed-out follow prints.
+	what string
+}
 
 // interruptedError is what Ctrl-C during a follow leaves behind. The work
 // goes on at the broker, so the message says how to pick it up again.
@@ -97,6 +101,27 @@ type interruptedError struct{ id string }
 
 func (e interruptedError) Error() string {
 	return fmt.Sprintf("interrupted; the work is still running on the broker, so follow it again with: boss task --follow %s", e.id)
+}
+
+// followTimeoutError says a follow gave up waiting while the work was
+// still going on at the broker.
+type followTimeoutError struct {
+	id, what string
+	limit    time.Duration
+}
+
+func (e followTimeoutError) Error() string {
+	return fmt.Sprintf("Boss stopped waiting after %s, but %s is still in progress on the broker, so follow it again with: boss task --follow %s", e.limit, e.what, e.id)
+}
+
+// followLimit is how long a follow may wait. The --timeout value applies
+// when we give one, and the long default for calls that wait on BOSH
+// applies otherwise.
+func (r *runner) followLimit() time.Duration {
+	if r.c.Timeout > 0 {
+		return r.c.Timeout
+	}
+	return longTimeout
 }
 
 // exitCode is the process exit status for the result of a command.
@@ -114,7 +139,7 @@ func exitCode(err error) int {
 // operationProgress follows an instance operation through the OSB
 // last_operation answer, which is what create and update wait on.
 func (r *runner) operationProgress(id string) pollFunc {
-	return func() (bool, error) {
+	return pollFunc{what: "the operation on instance " + id, read: func() (bool, error) {
 		op, err := r.c.LastOperation(id)
 		switch {
 		case errors.Is(err, ErrInstanceGone):
@@ -132,12 +157,12 @@ func (r *runner) operationProgress(id string) pollFunc {
 			return true, fmt.Errorf("the operation failed: %s", op.Description)
 		}
 		return true, fmt.Errorf("the broker reported the unknown state %q for the operation", op.State)
-	}
+	}}
 }
 
 // taskProgress follows one BOSH task through the broker's task route.
 func (r *runner) taskProgress(taskID int) pollFunc {
-	return func() (bool, error) {
+	return pollFunc{what: fmt.Sprintf("BOSH task %d", taskID), read: func() (bool, error) {
 		task, err := r.c.Task(taskID)
 		if err != nil {
 			return true, err
@@ -158,7 +183,7 @@ func (r *runner) taskProgress(taskID int) pollFunc {
 		}
 		// queued, processing, cancelling, and any state not known yet
 		return false, nil
-	}
+	}}
 }
 
 // follow prints the events of an instance's task log as they arrive and
@@ -186,6 +211,8 @@ func (r *runner) follow(id string, shown []TaskEvent, p pollFunc) error {
 		}
 	}
 
+	limit := r.followLimit()
+	deadline := time.Now().Add(limit)
 	for {
 		select {
 		case <-r.ctx.Done():
@@ -194,13 +221,16 @@ func (r *runner) follow(id string, shown []TaskEvent, p pollFunc) error {
 		}
 
 		show()
-		done, err := p()
+		done, err := p.read()
 		if r.ctx.Err() != nil {
 			return interruptedError{id: id}
 		}
 		if done || err != nil {
 			show()
 			return err
+		}
+		if time.Now().After(deadline) {
+			return followTimeoutError{id: id, what: p.what, limit: limit}
 		}
 	}
 }

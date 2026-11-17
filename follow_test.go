@@ -390,3 +390,52 @@ func TestRedeployFollowFailsWhenTheTaskFails(t *testing.T) {
 		t.Fatal("a failed task must fail the command")
 	}
 }
+
+func TestFollowStopsAtTheTimeoutAndSaysTheWorkIsStillRunning(t *testing.T) {
+	b := followBroker(t)
+	opState(b, "osb_last_operation_progress.json")
+	r, cancel := followRunner(t, b)
+	defer cancel()
+	r.c.Timeout = 150 * time.Millisecond
+
+	start := time.Now()
+	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID))
+	if err == nil {
+		t.Fatal("a follow that never finishes must end with an error")
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("the follow ran %s, past its 150ms limit", took)
+	}
+	for _, want := range []string{"still in progress", fixtureID, "boss task --follow"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error lacks %q: %v", want, err)
+		}
+	}
+	if exitCode(err) != 1 {
+		t.Errorf("exit code %d, want 1 like other timeouts", exitCode(err))
+	}
+}
+
+func TestATaskFollowNamesTheTaskWhenItTimesOut(t *testing.T) {
+	b := followBroker(t)
+	b.status("GET /b/tasks/5104", 200, "task_detail_processing.json")
+	r, cancel := followRunner(t, b)
+	defer cancel()
+	r.c.Timeout = 150 * time.Millisecond
+
+	err := r.follow(fixtureID, nil, r.taskProgress(5104))
+	if err == nil || !strings.Contains(err.Error(), "BOSH task 5104") || !strings.Contains(err.Error(), "still in progress") {
+		t.Errorf("got %v, want the task named as still in progress", err)
+	}
+}
+
+func TestFollowWithNoTimeoutGivesItselfTheLongDefault(t *testing.T) {
+	r, _, _ := testRunner(&Client{}, "", true)
+	if got := r.followLimit(); got != longTimeout {
+		t.Errorf("limit %s, want %s", got, longTimeout)
+	}
+	r.c.Timeout = 90 * time.Second
+	if got := r.followLimit(); got != 90*time.Second {
+		t.Errorf("limit %s, want the --timeout value", got)
+	}
+}
