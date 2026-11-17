@@ -815,7 +815,7 @@ var (
 	batchStatuses    = []string{"pending", "running", "paused", "completed", "failed", "cancelled"}
 	instanceStatuses = []string{"pending", "running", "success", "failed", "cancelled", "skipped", "outcome_unknown", "interrupted", "awaiting_decision"}
 	batchKinds       = []string{"upgrade", "certificates", "command"}
-	vmStatuses       = []string{"running", "failing", "unresponsive agent", "unresponsive", "provisioning", "error"}
+	vmStatuses       = []string{"running", "failing", "unresponsive agent", "unresponsive", "provisioning", "error", "unknown", "stopping", "starting", "stopped"}
 	taskStates       = []string{"queued", "processing", "cancelling", "cancelled", "done", "error", "timeout"}
 	rotationModes    = []string{"redeploy", "patch", "converge"}
 )

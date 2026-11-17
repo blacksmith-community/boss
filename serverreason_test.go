@@ -581,7 +581,28 @@ func TestTheCodeListsMatchTheBrokerExactly(t *testing.T) {
 		"weak_key",
 		"weak_signature",
 	})
+	vmWant := []string{"running", "failing", "unresponsive agent", "unresponsive", "provisioning", "error", "unknown", "stopping", "starting", "stopped"}
+	if got := strings.Join(vmStatuses, ","); got != strings.Join(vmWant, ",") {
+		t.Errorf("vmStatuses is %s", got)
+	}
 	if got := strings.Join(severityValues, ","); got != "error,warning,info" {
 		t.Errorf("severityValues is %s", got)
+	}
+}
+
+func TestEveryMonitorStatusTheBrokerWritesPrintsAsSent(t *testing.T) {
+	for _, status := range []string{"running", "failing", "unresponsive agent", "unresponsive", "provisioning", "error", "unknown", "stopping", "starting", "stopped"} {
+		t.Run(status, func(t *testing.T) {
+			body := strings.Replace(fixture(t, "vm_monitor.json"), `"last_status": "running"`, `"last_status": "`+status+`"`, 1)
+			b := newBroker(t, nil)
+			b.route("GET /b/bosh/vm-monitor", func(int) reply { return reply{Status: 200, Body: body} })
+			r, out, _ := testRunner(b.client(), "", true)
+			if err := r.monitor(nil); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), status) || strings.Contains(out.String(), valueWithheld) {
+				t.Errorf("status %q printed as %q", status, out)
+			}
+		})
 	}
 }
