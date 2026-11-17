@@ -28,9 +28,9 @@ type APIError struct {
 }
 
 func (e APIError) Error() string {
-	msg := e.Code
+	msg := machineOrReason(e.Code)
 	if e.Description != "" {
-		msg = fmt.Sprintf("%s: %s", e.Code, shownReason(e.Description))
+		msg = fmt.Sprintf("%s: %s", machineOrReason(e.Code), shownReason(e.Description))
 	}
 	if e.BrokerCode != "" {
 		msg += " (" + e.BrokerCode + ")"

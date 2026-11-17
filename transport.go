@@ -13,6 +13,7 @@ import (
 	"net/http/httptrace"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -680,6 +681,19 @@ func shownReason(s string) string {
 	return shown
 }
 
+// machineCode matches a snake_case identifier, such as credentials_error,
+// which is a machine error code and holds no secret.
+var machineCode = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
+// machineOrReason shows a machine error code in full and treats any other
+// text in the error field as a reason.
+func machineOrReason(s string) string {
+	if machineCode.MatchString(s) {
+		return s
+	}
+	return shownReason(s)
+}
+
 // fixedBrokerReasons are reasons the broker sends word for word, and each
 // is shown in full even though the check would withhold it. A reason must
 // equal an entry exactly, with the ends trimmed and the case kept, so text
@@ -692,6 +706,14 @@ var fixedBrokerReasons = map[string]bool{
 	"vault_max_versions must be between 0 and 1000 (0 = unlimited)": true,
 	// internal/handlers/services/redis/handler.go
 	"credentials not found": true,
+	// internal/handlers/services/handler.go
+	"credentials are not available because Vault is not configured":             true,
+	"credentials are not available because Vault did not answer":                true,
+	"credentials are not available because nothing is stored for this instance": true,
+	// internal/upgrade/command_authz.go
+	"This broker needs a valid command key in the X-Blacksmith-Command-Key header before it previews or runs a command.": true,
+	// internal/certinventory/service.go
+	"CredHub refused the broker's credentials.": true,
 }
 
 // reasonText cleans the broker's reason for display. It fails closed.

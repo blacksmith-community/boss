@@ -1,8 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -92,6 +95,10 @@ func (c Client) CertInventory(f CertFilter) (CertInventory, error) {
 
 	var out CertInventory
 	if _, err := c.request("GET", path, nil, &out); err != nil {
+		var api APIError
+		if errors.As(err, &api) && api.BrokerCode == "invalid_filter" {
+			err = badFilterError{filters: f, cause: api}
+		}
 		return out, fmt.Errorf("failed to read the certificate inventory: %w", err)
 	}
 	return out, nil
@@ -189,3 +196,24 @@ func (c Client) CertPreview(instanceID, mode, converge string, variables []strin
 	}
 	return out, nil
 }
+
+// badFilterError is Boss's own message for a filter the broker refused. The
+// broker echoes the value it was sent, so Boss names the filters the
+// operator passed in place of repeating the broker's text.
+type badFilterError struct {
+	filters CertFilter
+	cause   APIError
+}
+
+func (e badFilterError) Error() string {
+	var names []string
+	for k, v := range e.filters {
+		if v != "" {
+			names = append(names, fmt.Sprintf("%s %q", k, v))
+		}
+	}
+	sort.Strings(names)
+	return "the broker refused a filter, so check the filters you passed (" + strings.Join(names, ", ") + ") (invalid_filter)"
+}
+
+func (e badFilterError) Unwrap() error { return e.cause }
