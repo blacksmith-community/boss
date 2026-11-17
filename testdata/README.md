@@ -16,7 +16,20 @@ testdata/gen/run.sh /path/to/broker /path/to/output /path/to/broker-at-v1.8.2
 
 The script writes the newer responses to `head/` under the output folder, and the v1.8.2 responses to `v182/`. Each folder also holds a `MANIFEST.tsv` that lists the route and the status code behind every file. We copy a wanted file into this folder, and we add the `v182_` prefix to the ones from `v182/`.
 
-A fresh run differs from the committed files in a few values. The broker stamps timestamps from the clock, and the batch list orders jobs by those times, so `status*.json`, `orphans*.json`, and `batch_list.json` change from run to run. The files named `route_*` in the output are probes of routes the tests do not use, and we leave them out.
+Every committed fixture now has a step in the script. The v1.8.2 run covers the status index, the VM monitor, the task routes, the deployment routes, and the router's plain-text answers. A few files carry a different name in the output than in this folder, so we copy them by this table.
+
+| Output file | Committed as |
+|-------------|--------------|
+| `route_unknown.txt` | `v182_endpoint_not_found.txt` |
+| `route_upgrade_unknown.txt` | `v182_upgrade_endpoint_not_found.txt` |
+| `route_orphans.txt` | `v182_orphans_not_found.txt` |
+| `route_restart.txt` or `route_recreate.txt` | `v182_instance_action_not_found.txt` |
+| `bosh_tasks_empty.json` | `v182_tasks_empty.json` |
+| `bosh_tasks.json` | `v182_tasks_paged_request.json` |
+
+Every other file keeps its name, with the `v182_` prefix added for the v1.8.2 run.
+
+A fresh run differs from the committed files only in values that come from the clock. The broker stamps timestamps from the time of the run, and the batch list orders jobs by those times, so `status*.json`, `v182_status.json`, `orphans*.json`, and `batch_list.json` change from run to run. The files named `route_*` in the output that have no row in the table are probes of routes the tests do not use, and we leave them out.
 
 ## What the fixtures leave out
 
