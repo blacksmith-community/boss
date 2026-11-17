@@ -18,12 +18,14 @@ type BoshTask struct {
 	Timestamp   int64  `json:"timestamp"`
 	// StartedAt and EndedAt are RFC 3339 times. A task that has not
 	// started or has not ended leaves them out.
-	StartedAt  time.Time  `json:"started_at"`
-	EndedAt    *time.Time `json:"ended_at"`
-	Result     string     `json:"result"`
-	User       string     `json:"user"`
-	Deployment string     `json:"deployment"`
-	ContextID  string     `json:"context_id"`
+	StartedAt time.Time  `json:"started_at"`
+	EndedAt   *time.Time `json:"ended_at"`
+	Result    string     `json:"result"`
+	// Error is why the broker says a failed task failed.
+	Error      string `json:"error"`
+	User       string `json:"user"`
+	Deployment string `json:"deployment"`
+	ContextID  string `json:"context_id"`
 }
 
 // TaskFilter narrows a task listing.

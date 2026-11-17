@@ -61,6 +61,12 @@ func (r *runner) tasksList(args []string, f TaskFilter) error {
 			rows = append(rows, []string{strconv.Itoa(t.ID), t.State, t.Deployment, t.Description, clock(t.StartedAt)})
 		}
 		r.table([]string{"Task", "State", "Deployment", "Description", "Started"}, rows)
+
+		for _, t := range list.Tasks {
+			if t.Error != "" {
+				r.printf("\nTask %d failed: %s\n", t.ID, t.Error)
+			}
+		}
 	}
 
 	switch {

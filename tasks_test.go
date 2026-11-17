@@ -160,3 +160,22 @@ func TestTasksCancelReportsAConflict(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestTasksListShowsWhyATaskFailed(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/tasks": "bosh_tasks.json"})
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.tasksList(nil, TaskFilter{}); err != nil {
+		t.Fatal(err)
+	}
+
+	got := out.String()
+	for _, want := range []string{"Task 5101 failed", "fixture failure text"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "Task 5102 failed") {
+		t.Errorf("a finished task has no failure:\n%s", got)
+	}
+}
