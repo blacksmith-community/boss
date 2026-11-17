@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -311,7 +312,9 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.SetBasicAuth(c.Username, c.Password)
-	if c.CommandKey != "" {
+	// The key opens only the batch command routes, so no other route, and
+	// no log of one, ever sees it.
+	if c.CommandKey != "" && strings.HasPrefix(req.URL.Path, "/b/upgrade/") {
 		req.Header.Set(commandKeyHeader, c.CommandKey)
 	}
 
@@ -458,4 +461,20 @@ func (e BrokerTooOldError) Error() string {
 	}
 
 	return fmt.Sprintf("this broker is too old for %s, because it has no %s %s route; upgrade the broker to use it", command, e.Method, path)
+}
+
+// commandKey returns the key a batch command job needs. A key given
+// directly wins, and otherwise the key comes from the first line of the
+// file, which keeps it out of the shell history and the process list.
+func commandKey(key, file string) (string, error) {
+	if key != "" || file == "" {
+		return key, nil
+	}
+
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return "", fmt.Errorf("cannot read the command key file: %w", err)
+	}
+	line, _, _ := strings.Cut(string(b), "\n")
+	return strings.TrimSpace(line), nil
 }

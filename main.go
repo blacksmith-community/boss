@@ -37,7 +37,8 @@ var opt struct {
 	Org   string `cli:"--org" env:"BLACKSMITH_ORG"`
 	Space string `cli:"--space" env:"BLACKSMITH_SPACE"`
 
-	CommandKey string `cli:"--command-key" env:"BLACKSMITH_COMMAND_KEY"`
+	CommandKey     string `cli:"--command-key" env:"BLACKSMITH_COMMAND_KEY"`
+	CommandKeyFile string `cli:"--command-key-file" env:"BLACKSMITH_COMMAND_KEY_FILE"`
 
 	Timeout string `cli:"--timeout" env:"BOSS_TIMEOUT"`
 
@@ -205,7 +206,12 @@ func options() {
 	fmt.Printf("                  Defaults to @W{$BLACKSMITH_SPACE}, then @W{boss}\n")
 	fmt.Printf("\n")
 	fmt.Printf("  --command-key   Second credential for batch command jobs.\n")
-	fmt.Printf("                  Defaults to @W{$BLACKSMITH_COMMAND_KEY}.  Never logged.\n")
+	fmt.Printf("                  Defaults to @W{$BLACKSMITH_COMMAND_KEY}.  Never logged, and\n")
+	fmt.Printf("                  sent only on the batch command routes.  A flag value\n")
+	fmt.Printf("                  stays in the shell history, so prefer the variable.\n")
+	fmt.Printf("  --command-key-file PATH\n")
+	fmt.Printf("                  Read the key from the first line of a file.\n")
+	fmt.Printf("                  Defaults to @W{$BLACKSMITH_COMMAND_KEY_FILE}.\n")
 	fmt.Printf("\n")
 	fmt.Printf("  --timeout TIME  How long one request may take, such as 90s or 5m.\n")
 	fmt.Printf("                  Defaults to @W{$BOSS_TIMEOUT}, then 30s for a read and 15m\n")
@@ -395,6 +401,11 @@ func connect(ctx context.Context) *Client {
 		bail(err)
 	}
 
+	key, err := commandKey(opt.CommandKey, opt.CommandKeyFile)
+	if err != nil {
+		bail(err)
+	}
+
 	return &Client{
 		Ctx:                ctx,
 		Timeout:            timeout,
@@ -404,7 +415,7 @@ func connect(ctx context.Context) *Client {
 		InsecureSkipVerify: opt.SkipSSLValidation,
 		Debug:              opt.Debug,
 		Trace:              opt.Trace,
-		CommandKey:         opt.CommandKey,
+		CommandKey:         key,
 		Org:                opt.Org,
 		Space:              opt.Space,
 	}
