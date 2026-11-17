@@ -39,6 +39,8 @@ var opt struct {
 
 	CommandKey string `cli:"--command-key" env:"BLACKSMITH_COMMAND_KEY"`
 
+	Timeout string `cli:"--timeout" env:"BOSS_TIMEOUT"`
+
 	Yes bool `cli:"-y, --yes"`
 
 	Log struct {
@@ -202,6 +204,10 @@ func options() {
 	fmt.Printf("\n")
 	fmt.Printf("  --command-key   Second credential for batch command jobs.\n")
 	fmt.Printf("                  Defaults to @W{$BLACKSMITH_COMMAND_KEY}.  Never logged.\n")
+	fmt.Printf("\n")
+	fmt.Printf("  --timeout TIME  How long one request may take, such as 90s or 5m.\n")
+	fmt.Printf("                  Defaults to @W{$BOSS_TIMEOUT}, then 30s for a read and 15m\n")
+	fmt.Printf("                  for errands, restarts, and recreates\n")
 	fmt.Printf("\n")
 	fmt.Printf("  -y, --yes       Do not ask before a command changes anything.\n")
 	fmt.Printf("\n")
@@ -376,8 +382,15 @@ func boolFlag(b bool) string {
 	return ""
 }
 
-func connect() *Client {
+func connect(ctx context.Context) *Client {
+	timeout, err := parseTimeout(opt.Timeout)
+	if err != nil {
+		bail(err)
+	}
+
 	return &Client{
+		Ctx:                ctx,
+		Timeout:            timeout,
 		URL:                opt.URL,
 		Username:           opt.Username,
 		Password:           opt.Password,
@@ -452,7 +465,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("log", newRunner(connect(), ctx).log(args, LogOptions{
+		finish("log", newRunner(connect(ctx), ctx).log(args, LogOptions{
 			File: opt.Log.File, Limit: opt.Log.Limit, Offset: opt.Log.Offset,
 		}))
 		os.Exit(0)
@@ -470,7 +483,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		c := connect()
+		c := connect(ctx)
 		instances, err := c.Instances()
 		bail(err)
 
@@ -532,7 +545,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		c := connect()
+		c := connect(ctx)
 		catalog, err := c.Catalog()
 
 		if opt.Catalog.Long {
@@ -598,7 +611,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		c := connect()
+		c := connect(ctx)
 		finish("create", newRunner(c, ctx).create(args, opt.Create.ID, opt.Create.Params, opt.Create.Follow))
 		os.Exit(0)
 
@@ -610,7 +623,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		c := connect()
+		c := connect(ctx)
 		finish("update", newRunner(c, ctx).update(args, opt.Update.Params, opt.Update.Plan, opt.Update.Follow))
 		os.Exit(0)
 
@@ -621,7 +634,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("delete", newRunner(connect(), ctx).delete(args))
+		finish("delete", newRunner(connect(ctx), ctx).delete(args))
 		os.Exit(0)
 
 	case "task":
@@ -632,7 +645,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("task", newRunner(connect(), ctx).task(args, opt.Task.Follow))
+		finish("task", newRunner(connect(ctx), ctx).task(args, opt.Task.Follow))
 		os.Exit(0)
 
 	case "tasks", "tasks list", "tasks output", "tasks cancel":
@@ -643,7 +656,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		r := newRunner(connect(), ctx)
+		r := newRunner(connect(ctx), ctx)
 		switch command {
 		case "tasks list":
 			finish(command, r.tasksList(args, TaskFilter{Type: opt.Tasks.List.Type, State: opt.Tasks.List.State,
@@ -663,7 +676,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		r := newRunner(connect(), ctx)
+		r := newRunner(connect(ctx), ctx)
 		switch command {
 		case "batch list":
 			finish(command, r.batchList(args))
@@ -683,7 +696,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		r := newRunner(connect(), ctx)
+		r := newRunner(connect(ctx), ctx)
 		switch command {
 		case "certificates list":
 			l := opt.Certificates.List
@@ -717,7 +730,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		r := newRunner(connect(), ctx)
+		r := newRunner(connect(ctx), ctx)
 		switch command {
 		case "deployment errands":
 			finish(command, r.errands(args))
@@ -736,7 +749,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish(command, newRunner(connect(), ctx).resurrection(args, strings.TrimPrefix(command, "resurrection ")))
+		finish(command, newRunner(connect(ctx), ctx).resurrection(args, strings.TrimPrefix(command, "resurrection ")))
 		os.Exit(0)
 
 	case "monitor":
@@ -746,7 +759,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("monitor", newRunner(connect(), ctx).monitor(args))
+		finish("monitor", newRunner(connect(ctx), ctx).monitor(args))
 		os.Exit(0)
 
 	case "orphans":
@@ -759,7 +772,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("orphans", newRunner(connect(), ctx).orphans(args))
+		finish("orphans", newRunner(connect(ctx), ctx).orphans(args))
 		os.Exit(0)
 
 	case "manifest":
@@ -769,7 +782,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("manifest", newRunner(connect(), ctx).manifest(args))
+		finish("manifest", newRunner(connect(ctx), ctx).manifest(args))
 		os.Exit(0)
 
 	case "redeploy":
@@ -780,7 +793,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("redeploy", newRunner(connect(), ctx).redeploy(args, opt.Redeploy.Restart))
+		finish("redeploy", newRunner(connect(ctx), ctx).redeploy(args, opt.Redeploy.Restart))
 		os.Exit(0)
 
 	case "creds":
@@ -790,7 +803,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("creds", newRunner(connect(), ctx).creds(args))
+		finish("creds", newRunner(connect(ctx), ctx).creds(args))
 		os.Exit(0)
 	}
 }

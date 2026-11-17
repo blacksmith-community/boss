@@ -33,6 +33,9 @@ func (e APIError) Error() string {
 	if e.BrokerCode != "" {
 		msg += " (" + e.BrokerCode + ")"
 	}
+	if e.Status == 504 {
+		msg += "; the outcome is unknown and the action may still be running, so check boss tasks list before running it again"
+	}
 	return msg
 }
 
@@ -76,7 +79,8 @@ type Client struct {
 	Debug bool
 	// Trace enables HTTP request/response tracing
 	Trace bool
-	// Timeout sets the HTTP client timeout (default: 30s)
+	// Timeout sets the HTTP client timeout for every call (default: 30s for
+	// a read, 15m for a call that waits on BOSH)
 	Timeout time.Duration
 	// MaxRetries sets the maximum number of retry attempts (default: 3)
 	MaxRetries int
@@ -88,6 +92,8 @@ type Client struct {
 	Space string
 	// Stderr receives debug and trace output (default: os.Stderr)
 	Stderr io.Writer
+	// longCall marks a call that waits on BOSH, which gets a longer timeout
+	longCall bool
 	// Backoff is the unit of the pause between attempts (default: 1s)
 	Backoff time.Duration
 	// Ctx ends any request in flight when it is done (default: never)
@@ -606,7 +612,7 @@ func (c Client) Redeploy(id string, restart bool) (ActionResult, error) {
 	}
 
 	var out ActionResult
-	_, err := c.request("POST", instancePath(id, "/"+action), nil, &out)
+	_, err := c.long().request("POST", instancePath(id, "/"+action), nil, &out)
 	if err != nil {
 		return out, fmt.Errorf("failed to %s %s: %w", action, id, err)
 	}

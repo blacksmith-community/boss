@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	env "github.com/jhunt/go-envirotron"
@@ -30,7 +31,7 @@ func TestOrgAndSpaceDefaultToBoss(t *testing.T) {
 	opt.Org, opt.Space = "", ""
 	env.Override(&opt)
 
-	c := connect()
+	c := connect(context.Background())
 	if c.org() != "boss" || c.space() != "boss" {
 		t.Errorf("got %q and %q", c.org(), c.space())
 	}
@@ -44,7 +45,7 @@ func TestOrgAndSpaceComeFromTheEnvironment(t *testing.T) {
 	opt.Org, opt.Space = "", ""
 	env.Override(&opt)
 
-	c := connect()
+	c := connect(context.Background())
 	if c.Org != "env-org" || c.Space != "env-space" {
 		t.Errorf("got %q and %q", c.Org, c.Space)
 	}

@@ -22,7 +22,7 @@ type DeploymentAction struct {
 // deployment. op is one of those four words.
 func (c Client) DeploymentOp(name, op string) (DeploymentAction, error) {
 	var out DeploymentAction
-	if _, err := c.request("POST", deploymentPath(name, "/"+op), nil, &out); err != nil {
+	if _, err := c.long().request("POST", deploymentPath(name, "/"+op), nil, &out); err != nil {
 		return out, fmt.Errorf("failed to %s deployment %s: %w", op, name, err)
 	}
 	return out, nil
@@ -65,7 +65,7 @@ func (c Client) RunErrand(name, errand string, instances []string) (ErrandResult
 	}
 
 	var out ErrandResult
-	if _, err := c.request("POST", path, nil, &out); err != nil {
+	if _, err := c.long().request("POST", path, nil, &out); err != nil {
 		return out, fmt.Errorf("failed to run errand %s on %s: %w", errand, name, err)
 	}
 	return out, nil

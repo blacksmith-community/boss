@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,15 +23,76 @@ const commandKeyHeader = "X-Blacksmith-Command-Key"
 // redacted stands in for anything a log line must not carry.
 const redacted = "[redacted]"
 
-// httpClient builds the HTTP client for one request.
-func (c Client) httpClient() *http.Client {
-	timeout := c.Timeout
-	if timeout == 0 {
-		timeout = 30 * time.Second
+// Default timeouts. A read gives up quickly. A call that waits for the
+// director to finish work gets much longer.
+const (
+	readTimeout = 30 * time.Second
+	longTimeout = 15 * time.Minute
+)
+
+// long returns a client for calls that wait on BOSH, such as an errand,
+// a restart, or a recreate.
+func (c Client) long() Client {
+	c.longCall = true
+	return c
+}
+
+// requestTimeout is how long one request may take. An explicit Timeout
+// wins for every call.
+func (c Client) requestTimeout() time.Duration {
+	switch {
+	case c.Timeout > 0:
+		return c.Timeout
+	case c.longCall:
+		return longTimeout
+	}
+	return readTimeout
+}
+
+// parseTimeout reads a --timeout value as a duration such as 90s or 5m,
+// or as a bare number of seconds. An empty value means no override.
+func parseTimeout(s string) (time.Duration, error) {
+	if s == "" {
+		return 0, nil
 	}
 
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		n, nerr := strconv.Atoi(s)
+		if nerr != nil {
+			return 0, fmt.Errorf("invalid timeout %q; use a duration such as 90s or 5m", s)
+		}
+		d = time.Duration(n) * time.Second
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("invalid timeout %q; it must be positive", s)
+	}
+	return d, nil
+}
+
+// UnknownOutcomeError says a request that changes things timed out, so
+// the action may or may not have started.
+type UnknownOutcomeError struct {
+	Method string
+	Cause  error
+}
+
+func (e UnknownOutcomeError) Error() string {
+	return fmt.Sprintf("the %s request timed out, so its outcome is unknown and the action may still be running; check boss tasks list before running it again", e.Method)
+}
+
+func (e UnknownOutcomeError) Unwrap() error { return e.Cause }
+
+// timedOut says whether err is a client side timeout.
+func timedOut(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
+}
+
+// httpClient builds the HTTP client for one request.
+func (c Client) httpClient() *http.Client {
 	return &http.Client{
-		Timeout: timeout,
+		Timeout: c.requestTimeout(),
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				// #nosec G402 -- InsecureSkipVerify is a configurable option for development environments
@@ -280,6 +342,9 @@ func (c Client) doSingle(method, path string, in interface{}) (*http.Response, e
 func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, error) {
 	res, err := c.do(method, path, in)
 	if err != nil {
+		if !idempotent(method) && timedOut(err) {
+			return 0, nil, UnknownOutcomeError{Method: method, Cause: err}
+		}
 		return 0, nil, fmt.Errorf("request failed: %w", err)
 	}
 
