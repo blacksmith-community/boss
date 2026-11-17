@@ -1,0 +1,1 @@
+{"preview_id": "preview-aaaa-0001", "expires_at": "2026-11-03T08:30:00Z", "instances": [{"instance_id": "11111111-aaaa-bbbb-cccc-000000000001", "instance_name": "fixture-one", "mode": "redeploy", "vms": 1, "selected": [{"name": "redis_tls", "days_left": 17}], "impact": "one VM is recreated", "blocked": null}], "warnings": ["fixture warning"]}

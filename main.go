@@ -96,6 +96,33 @@ var opt struct {
 		Cancel struct{} `cli:"cancel"`
 	} `cli:"batch"`
 
+	Certificates struct {
+		List struct {
+			Expiry      string `cli:"--expiry"`
+			Health      string `cli:"--health"`
+			Kind        string `cli:"--kind"`
+			Source      string `cli:"--source"`
+			Owner       string `cli:"--owner"`
+			Service     string `cli:"--service"`
+			Plan        string `cli:"--plan"`
+			Instance    string `cli:"--instance"`
+			Finding     string `cli:"--finding"`
+			Attention   bool   `cli:"--attention"`
+			SummaryOnly bool   `cli:"--summary-only"`
+			Query       string `cli:"--query"`
+		} `cli:"list, ls"`
+		Show     struct{} `cli:"show"`
+		Instance struct{} `cli:"instance"`
+		Scan     struct {
+			Instances []string `cli:"--instance"`
+		} `cli:"scan"`
+		Preview struct {
+			Variables []string `cli:"--variable"`
+			Mode      string   `cli:"--mode"`
+			Converge  string   `cli:"--converge"`
+		} `cli:"preview"`
+	} `cli:"certificates, certs"`
+
 	Manifest struct{} `cli:"manifest"`
 
 	Creds struct{} `cli:"creds"`
@@ -226,6 +253,26 @@ func batch_options() {
 	fmt.Printf("\n")
 }
 
+func certificates_options() {
+	fmt.Printf("Subcommands:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  @G{certificates list}      List the certificate inventory.  Filters: --expiry,\n")
+	fmt.Printf("                           --health, --kind, --source, --owner, --service,\n")
+	fmt.Printf("                           --plan, --instance, --finding, --query,\n")
+	fmt.Printf("                           --attention, --summary-only\n")
+	fmt.Printf("  @G{certificates show}      Show one certificate by ID.\n")
+	fmt.Printf("  @G{certificates instance}  Show the certificates of one instance.\n")
+	fmt.Printf("  @G{certificates scan}      Start a scan, after asking.  Option: --instance ID\n")
+	fmt.Printf("                           (repeatable)\n")
+	fmt.Printf("  @G{certificates preview}   Show what a rotation would do, and change nothing.\n")
+	fmt.Printf("                           Options: --variable NAME (repeatable, required),\n")
+	fmt.Printf("                           --mode redeploy|patch|converge (default redeploy),\n")
+	fmt.Printf("                           --converge pending|immediate\n")
+	fmt.Printf("\n")
+	fmt.Printf("Boss does not start a rotation yet.\n")
+	fmt.Printf("\n")
+}
+
 func task_options() {
 	fmt.Printf("Command Options:\n")
 	fmt.Printf("\n")
@@ -262,6 +309,14 @@ func bad(command, msg string, args ...interface{}) {
 	} else {
 		fmt.Printf("Try @W{boss} @C{%s -h} for more information.\n\n", command)
 	}
+}
+
+// boolFlag turns a switch into the query value the broker reads.
+func boolFlag(b bool) string {
+	if b {
+		return "true"
+	}
+	return ""
 }
 
 func connect() *Client {
@@ -559,6 +614,40 @@ func main() {
 			finish(command, r.batchShow(args))
 		default:
 			finish(command, r.batchAction(args, strings.TrimPrefix(command, "batch ")))
+		}
+		os.Exit(0)
+
+	case "certificates", "certificates list", "certificates show", "certificates instance",
+		"certificates scan", "certificates preview":
+		if opt.Help || command == "certificates" {
+			usage("@C{certificates} @M{list|show|instance|scan|preview} [options]")
+			certificates_options()
+			options()
+			os.Exit(0)
+		}
+
+		r := newRunner(connect(), ctx)
+		switch command {
+		case "certificates list":
+			l := opt.Certificates.List
+			finish(command, r.certList(args, CertFilter{
+				"expiry": l.Expiry, "health": l.Health, "kind": l.Kind, "source": l.Source,
+				"owner": l.Owner, "service": l.Service, "plan": l.Plan, "instance": l.Instance,
+				"finding": l.Finding, "q": l.Query, "attention": boolFlag(l.Attention),
+			}, l.SummaryOnly))
+		case "certificates show":
+			finish(command, r.certShow(args))
+		case "certificates instance":
+			finish(command, r.certInstance(args))
+		case "certificates scan":
+			finish(command, r.certScan(args, opt.Certificates.Scan.Instances))
+		case "certificates preview":
+			p := opt.Certificates.Preview
+			mode := p.Mode
+			if mode == "" {
+				mode = "redeploy"
+			}
+			finish(command, r.certPreview(args, p.Variables, mode, p.Converge))
 		}
 		os.Exit(0)
 
