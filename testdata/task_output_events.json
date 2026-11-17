@@ -1,0 +1,4 @@
+[
+  {"time": 1790000001, "stage": "Preparing deployment", "task": "Preparing deployment", "index": 1, "total": 1, "state": "started"},
+  {"time": 1790000002, "stage": "Preparing deployment", "task": "Preparing deployment", "index": 1, "total": 1, "state": "finished"}
+]

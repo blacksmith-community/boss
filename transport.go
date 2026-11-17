@@ -70,6 +70,7 @@ func isSensitivePath(path string) bool {
 		strings.HasSuffix(p, "/manifest") ||
 		strings.HasSuffix(p, "/manifest-details") ||
 		strings.HasPrefix(p, "/b/upgrade/tasks/") ||
+		(strings.HasPrefix(p, "/b/tasks/") && strings.HasSuffix(p, "/output")) ||
 		strings.Contains(p, "/errands/")
 }
 

@@ -70,6 +70,21 @@ var opt struct {
 		Follow bool `cli:"-f, --follow"`
 	} `cli:"task"`
 
+	Tasks struct {
+		List struct {
+			Type   string `cli:"--type"`
+			State  string `cli:"--state"`
+			Limit  int    `cli:"--limit"`
+			Offset int    `cli:"--offset"`
+		} `cli:"list, ls"`
+		Output struct {
+			Type string `cli:"--type"`
+		} `cli:"output"`
+		Cancel struct {
+			Force bool `cli:"--force"`
+		} `cli:"cancel"`
+	} `cli:"tasks"`
+
 	Manifest struct{} `cli:"manifest"`
 
 	Creds struct{} `cli:"creds"`
@@ -169,6 +184,17 @@ func update_options() {
 	fmt.Printf("  -c, --params    Update parameters, as JSON or the path of\n")
 	fmt.Printf("                  a JSON or YAML file\n")
 	fmt.Printf("  --plan NAME     Move the instance to another plan of its service\n")
+	fmt.Printf("\n")
+}
+
+func tasks_options() {
+	fmt.Printf("Subcommands:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  @G{tasks list}    List BOSH tasks.  Options: --type recent|current|all,\n")
+	fmt.Printf("                  --state STATE, --limit N, --offset N\n")
+	fmt.Printf("  @G{tasks output}  Show the output of a task.  Option: --type\n")
+	fmt.Printf("                  task|debug|result|event (default is task)\n")
+	fmt.Printf("  @G{tasks cancel}  Cancel a task, after asking.  Option: --force\n")
 	fmt.Printf("\n")
 }
 
@@ -466,6 +492,26 @@ func main() {
 		}
 
 		finish("task", newRunner(connect(), ctx).task(args, opt.Task.Follow))
+		os.Exit(0)
+
+	case "tasks", "tasks list", "tasks output", "tasks cancel":
+		if opt.Help || command == "tasks" {
+			usage("@C{tasks} @M{list|output|cancel} [options]")
+			tasks_options()
+			options()
+			os.Exit(0)
+		}
+
+		r := newRunner(connect(), ctx)
+		switch command {
+		case "tasks list":
+			finish(command, r.tasksList(args, TaskFilter{Type: opt.Tasks.List.Type, State: opt.Tasks.List.State,
+				Limit: opt.Tasks.List.Limit, Offset: opt.Tasks.List.Offset}))
+		case "tasks output":
+			finish(command, r.tasksOutput(args, opt.Tasks.Output.Type))
+		case "tasks cancel":
+			finish(command, r.tasksCancel(args, opt.Tasks.Cancel.Force))
+		}
 		os.Exit(0)
 
 	case "manifest":
