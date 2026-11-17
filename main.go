@@ -454,15 +454,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		if len(args) != 1 {
-			bad("delete", "@R{The `instance' argument is required.}")
-			os.Exit(1)
-		}
-
-		c := connect()
-		err := c.Delete(args[0])
-		bail(err)
-		fmt.Printf("@C{%s} instance deleted.\n", args[0])
+		finish("delete", newRunner(connect(), ctx).delete(args))
 		os.Exit(0)
 
 	case "task":

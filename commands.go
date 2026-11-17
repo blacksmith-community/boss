@@ -371,3 +371,27 @@ func findPlan(cat Catalog, serviceID, plan string) (string, error) {
 	}
 	return "", fmt.Errorf("service '%s' is not in the catalog", serviceID)
 }
+
+// delete removes a service instance. An ID the broker's index does not
+// list is used as typed, so a half-provisioned instance can still go.
+func (r *runner) delete(args []string) error {
+	if len(args) != 1 {
+		return usageErr("The `instance' argument is required.")
+	}
+
+	id := args[0]
+	if resolved, err := r.c.Resolve(id); err == nil {
+		id = resolved
+	}
+
+	if err := r.confirm("Delete instance %s and its BOSH deployment?", id); err != nil {
+		return err
+	}
+
+	if err := r.c.Delete(id); err != nil {
+		return err
+	}
+
+	r.printf("%s instance deleted.\n", id)
+	return nil
+}
