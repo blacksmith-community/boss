@@ -147,6 +147,9 @@ type Plan struct {
 	Description string `json:"description"`
 	Free        bool   `json:"free,omitempty"`
 	Bindable    *bool  `json:"bindable,omitempty"`
+	// PlanUpdateable, when set, overrides the service's value for
+	// instances of this plan.
+	PlanUpdateable *bool `json:"plan_updateable,omitempty"`
 }
 
 // Service represents a service in the Blacksmith catalog
@@ -156,7 +159,7 @@ type Service struct {
 	Description    string                 `json:"description"`
 	Bindable       bool                   `json:"bindable"`
 	Tags           []string               `json:"tags"`
-	PlanUpdateable bool                   `json:"plan_updateable"`
+	PlanUpdateable *bool                  `json:"plan_updateable,omitempty"`
 	Plans          []Plan                 `json:"plans"`
 	Requires       []string               `json:"requires,omitempty"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`

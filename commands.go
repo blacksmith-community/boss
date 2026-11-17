@@ -397,7 +397,7 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 		if err != nil {
 			return err
 		}
-		planID, err = findPlan(cat, ref.ServiceID, planName)
+		planID, err = findPlan(cat, ref.ServiceID, ref.PlanID, planName)
 		if err != nil {
 			return err
 		}
@@ -429,15 +429,29 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 	return nil
 }
 
-// findPlan finds a plan of a service by name or ID.
-func findPlan(cat Catalog, serviceID, plan string) (string, error) {
+// findPlan finds a plan of a service by name or ID. The plan the instance
+// uses now decides whether a change is allowed. Its own plan_updateable
+// value wins over the service's, and a missing value means false under
+// the OSB specification.
+func findPlan(cat Catalog, serviceID, currentPlanID, plan string) (string, error) {
 	for _, s := range cat.Services {
 		if s.ID != serviceID {
 			continue
 		}
-		if !s.PlanUpdateable {
+
+		allowed := s.PlanUpdateable
+		for _, p := range s.Plans {
+			if p.ID == currentPlanID && p.PlanUpdateable != nil {
+				allowed = p.PlanUpdateable
+			}
+		}
+		switch {
+		case allowed == nil:
+			return "", fmt.Errorf("the catalog does not mark service '%s' plan_updateable, and the OSB specification treats a missing value as false, so a plan change is refused", s.Name)
+		case !*allowed:
 			return "", fmt.Errorf("the catalog says service '%s' does not allow a plan change (plan_updateable is false)", s.Name)
 		}
+
 		for _, p := range s.Plans {
 			if p.ID == plan || p.Name == plan {
 				return p.ID, nil
