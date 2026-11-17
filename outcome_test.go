@@ -145,7 +145,7 @@ func rawServer(t *testing.T, answer func(net.Conn)) string {
 				return
 			}
 			go func() {
-				defer conn.Close()
+				defer closeQuietly(conn)
 				buf := make([]byte, 4096)
 				_, _ = conn.Read(buf)
 				answer(conn)
