@@ -483,6 +483,10 @@ func (c Client) Update(id, service, plan, previousPlan string, params map[string
 	}
 
 	_, err := c.request("PATCH", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, nil)
+	var apiErr APIError
+	if errors.As(err, &apiErr) && apiErr.Status == 500 && strings.Contains(apiErr.Description, "not implemented") {
+		return Instance{}, fmt.Errorf("failed to update instance %s: this broker doesn't support updates yet", id)
+	}
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to update instance %s: %w", id, err)
 	}

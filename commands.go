@@ -335,6 +335,9 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 		if err != nil {
 			return err
 		}
+		if planID == ref.PlanID {
+			return fmt.Errorf("instance %s already uses plan %s", ref.ID, planName)
+		}
 	}
 
 	what := "parameters"
@@ -365,6 +368,9 @@ func findPlan(cat Catalog, serviceID, plan string) (string, error) {
 	for _, s := range cat.Services {
 		if s.ID != serviceID {
 			continue
+		}
+		if !s.PlanUpdateable {
+			return "", fmt.Errorf("the catalog says service '%s' does not allow a plan change (plan_updateable is false)", s.Name)
 		}
 		for _, p := range s.Plans {
 			if p.ID == plan || p.Name == plan {

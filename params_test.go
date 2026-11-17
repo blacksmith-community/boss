@@ -118,8 +118,75 @@ func TestUpdateSendsParameters(t *testing.T) {
 	}
 }
 
-func TestUpdateChangesThePlan(t *testing.T) {
+// updatableCatalog is the recorded catalog with plan_updateable switched
+// on and the instance's own plan added. The broker never sets that field,
+// so the recorded catalog alone cannot show the path that allows a change.
+func updatableCatalog(t *testing.T) string {
+	t.Helper()
+
+	var cat map[string]interface{}
+	if err := json.Unmarshal([]byte(fixture(t, "catalog.json")), &cat); err != nil {
+		t.Fatal(err)
+	}
+	svc := cat["services"].([]interface{})[0].(map[string]interface{})
+	svc["plan_updateable"] = true
+	svc["plans"] = append(svc["plans"].([]interface{}), map[string]interface{}{"id": "redis-plan", "name": "standalone", "description": "fixture plan"})
+
+	out, err := json.Marshal(cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
+}
+
+func updatableBroker(t *testing.T) *fakeBroker {
 	b := osbBroker(t)
+	b.route("GET /v2/catalog", func(int) reply { return reply{Status: 200, Body: updatableCatalog(t)} })
+	return b
+}
+
+func TestUpdateRefusesAPlanChangeTheCatalogDoesNotAllow(t *testing.T) {
+	b := osbBroker(t)
+	r, _, _ := testRunner(b.client(), "", true)
+
+	err := r.update([]string{fixtureID}, "", "large", false)
+	if err == nil || !strings.Contains(err.Error(), "plan_updateable") {
+		t.Fatalf("got %v, want a refusal that names plan_updateable", err)
+	}
+	if len(only(b.requests(), "PATCH")) != 0 {
+		t.Error("PATCH went out")
+	}
+}
+
+func TestUpdateRefusesTheCurrentPlan(t *testing.T) {
+	b := updatableBroker(t)
+	r, _, _ := testRunner(b.client(), "", true)
+
+	err := r.update([]string{fixtureID}, "", "standalone", false)
+	if err == nil || !strings.Contains(err.Error(), "already uses") {
+		t.Fatalf("got %v, want a refusal that the plan is unchanged", err)
+	}
+	if len(only(b.requests(), "PATCH")) != 0 {
+		t.Error("PATCH went out")
+	}
+}
+
+func TestUpdateSaysWhenTheBrokerCannotUpdate(t *testing.T) {
+	b := osbBroker(t)
+	b.status("PATCH /v2/service_instances/"+fixtureID, 500, "osb_update.json")
+	r, _, _ := testRunner(b.client(), "", true)
+
+	err := r.update([]string{fixtureID}, `{"a":1}`, "", false)
+	if err == nil || !strings.Contains(err.Error(), "doesn't support updates yet") {
+		t.Fatalf("got %v", err)
+	}
+	if len(only(b.requests(), "PATCH")) != 1 {
+		t.Error("the update was sent more than once")
+	}
+}
+
+func TestUpdateChangesThePlan(t *testing.T) {
+	b := updatableBroker(t)
 	r, _, _ := testRunner(b.client(), "", true)
 
 	if err := r.update([]string{fixtureID}, "", "large", false); err != nil {
@@ -137,7 +204,7 @@ func TestUpdateChangesThePlan(t *testing.T) {
 }
 
 func TestUpdateRejectsAnUnknownPlanAndAnEmptyUpdate(t *testing.T) {
-	b := osbBroker(t)
+	b := updatableBroker(t)
 	r, _, _ := testRunner(b.client(), "", true)
 
 	if err := r.update([]string{fixtureID}, "", "huge", false); err == nil || !strings.Contains(err.Error(), "no plan 'huge'") {
