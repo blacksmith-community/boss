@@ -1,0 +1,7 @@
+{
+  "deployment": "fixture-dep",
+  "errands": [
+    "smoke-tests",
+    "cleanup"
+  ]
+}

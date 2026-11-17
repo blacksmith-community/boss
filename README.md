@@ -103,7 +103,7 @@ The other commands follow the broker's own `/b/` routes, and the table shows how
 
 | Command | v1.8.2 | Newer line |
 |---------|--------|------------|
-| `tasks`, `monitor`, and the `deployment` commands | Works, and we checked the response shapes. The task list is a bare array with no paging hints. | Works, with paging hints |
+| `tasks`, `monitor`, and the `deployment` commands, including errands, stop, and start | Works, and we checked every response shape against recorded v1.8.2 answers. That includes task output and task cancel. The task list is a bare array with no paging hints. | Works, with paging hints |
 | `batch`, `certificates`, and `resurrection` | The routes exist, but we checked response shapes only against the newer line | Works |
 | `redeploy` | Falls back to the deployment recreate and restart routes, using the deployment name from the broker's index | Uses the per-instance routes |
 | `orphans` | Not served, so Boss says the broker is too old | Works |

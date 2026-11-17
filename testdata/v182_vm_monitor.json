@@ -1,0 +1,23 @@
+{
+  "running": true,
+  "service_count": 1,
+  "normal_interval": "1h0m0s",
+  "failed_interval": "5m0s",
+  "services": [
+    {
+      "service_id": "11111111-aaaa-bbbb-cccc-000000000001",
+      "deployment_name": "redis-small-11111111",
+      "last_status": "running",
+      "last_check": "2026-11-14T08:00:00Z",
+      "next_check": "2026-11-14T09:00:00Z",
+      "is_due": false,
+      "failure_count": 0,
+      "is_healthy": true,
+      "is_provisioning": false
+    }
+  ],
+  "summary": {
+    "failing": 0,
+    "healthy": 1
+  }
+}

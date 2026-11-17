@@ -1,0 +1,11 @@
+{
+  "deployment": "fixture-dep",
+  "errand": "smoke-tests",
+  "exit_code": 0,
+  "instance": "node",
+  "instance_id": "fixture-uuid-0",
+  "results": [],
+  "skipped": false,
+  "stderr": "",
+  "stdout": "all fixture checks passed"
+}
