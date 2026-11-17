@@ -178,22 +178,58 @@ func (c Client) logURL() string {
 	return u.Redacted()
 }
 
-// parseReason is why a URL did not parse, without the URL. The parse
-// error of the standard library quotes the whole input, userinfo
-// included, so only its cause is kept.
+// parseReason says what is wrong with a URL that did not parse, in a
+// fixed phrase. The error of the standard library quotes the input,
+// userinfo and bad escapes included, so its text is only used to pick a
+// phrase and never shown.
 func parseReason(err error) string {
 	var ue *url.Error
-	if errors.As(err, &ue) {
-		return ue.Err.Error()
+	if !errors.As(err, &ue) {
+		return "it is not valid"
+	}
+
+	cause := ue.Err.Error()
+	switch {
+	case strings.Contains(cause, "invalid port"):
+		return "its port is not valid"
+	case strings.Contains(cause, "invalid URL escape"):
+		return "it has a bad percent escape"
+	case strings.Contains(cause, "invalid userinfo"):
+		return "its user information is not valid"
+	case strings.Contains(cause, "in host") || strings.Contains(cause, "host name"):
+		return "its host is not valid"
+	case strings.Contains(cause, "invalid character") || strings.Contains(cause, "control character"):
+		return "it has an invalid character"
 	}
 	return "it is not valid"
 }
 
+// checkBrokerURL says whether the broker URL can be used. It needs the
+// scheme http or https and a host. The message never repeats the value,
+// because the value can hold a password.
+func checkBrokerURL(raw string) error {
+	u, err := url.Parse(strings.TrimSuffix(raw, "/"))
+	if err != nil {
+		return fmt.Errorf("the broker URL is not valid, because %s", parseReason(err))
+	}
+
+	if scheme := strings.ToLower(u.Scheme); scheme != "http" && scheme != "https" {
+		return errors.New("the broker URL is not valid, because it must start with http:// or https://")
+	}
+	if u.Host == "" {
+		return errors.New("the broker URL is not valid, because it names no host")
+	}
+	return nil
+}
+
 // buildURL joins the broker's base URL with a path that may carry a query.
 func (c Client) buildURL(path string) (string, error) {
+	if err := checkBrokerURL(c.URL); err != nil {
+		return "", err
+	}
 	u, err := url.Parse(strings.TrimSuffix(c.URL, "/"))
 	if err != nil {
-		return "", fmt.Errorf("invalid URL %s: %s", c.logURL(), parseReason(err))
+		return "", err
 	}
 
 	rel, err := url.Parse(path)

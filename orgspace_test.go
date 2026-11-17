@@ -30,6 +30,7 @@ func TestOrgAndSpaceDefaultToBoss(t *testing.T) {
 	t.Cleanup(func() { opt = saved })
 	opt.Org, opt.Space = "", ""
 	env.Override(&opt)
+	opt.URL = "http://broker.example"
 
 	c := connect(context.Background())
 	if c.org() != "boss" || c.space() != "boss" {
@@ -44,6 +45,7 @@ func TestOrgAndSpaceComeFromTheEnvironment(t *testing.T) {
 	t.Cleanup(func() { opt = saved })
 	opt.Org, opt.Space = "", ""
 	env.Override(&opt)
+	opt.URL = "http://broker.example"
 
 	c := connect(context.Background())
 	if c.Org != "env-org" || c.Space != "env-space" {

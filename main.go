@@ -417,6 +417,10 @@ func connect(ctx context.Context) *Client {
 		bail(err)
 	}
 
+	if err := checkBrokerURL(opt.URL); err != nil {
+		bail(err)
+	}
+
 	return &Client{
 		Ctx:                ctx,
 		Timeout:            timeout,
