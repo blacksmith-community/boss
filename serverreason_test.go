@@ -351,3 +351,32 @@ func TestOnlyABrokerCodePrintsInParentheses(t *testing.T) {
 		}
 	}
 }
+
+func TestOnlyAListedCodePrintsForAFindingOrABlockedPreview(t *testing.T) {
+	for _, code := range []string{"weak_key", "chain_broken", "instance_busy", "instance_not_found"} {
+		if got := listedCode(code); got != code {
+			t.Errorf("%s printed as %q", code, got)
+		}
+	}
+	for _, code := range []string{"hunter2", "esc\x1b[31m", "db_password_hunter2", "two words", ""} {
+		if got := listedCode(code); got != codeWithheld {
+			t.Errorf("%q printed as %q", code, got)
+		}
+	}
+
+	finding := `{"findings":[{"severity":"warning","code":"hunter2","message":"a plain message"}],`
+	b := newBroker(t, nil)
+	b.route("GET /b/certificates/items/c0ffee01", func(int) reply {
+		return reply{Status: 200, Body: strings.Replace(fixture(t, "cert_item.json"), "{", finding, 1)}
+	})
+	r, out, _ := testRunner(b.client(), "", true)
+	_ = r.certShow([]string{"c0ffee01"})
+	if leaks(out.String()) || !strings.Contains(out.String(), "[warning] "+codeWithheld+": a plain message") {
+		t.Errorf("finding output %q", out)
+	}
+
+	got := previewOutput(t, withText(t, "cert_preview.json", `"blocked": null`, `"blocked": {"code":"hunter2","message":"a plain message"}`))
+	if leaks(got) || !strings.Contains(got, "BLOCKED ["+codeWithheld+"]: a plain message") {
+		t.Errorf("preview output %q", got)
+	}
+}

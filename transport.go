@@ -741,6 +741,29 @@ var brokerCodes = map[string]bool{
 	"E008":                        true,
 }
 
+// findingCodes are the codes of a certificate finding. They are the Finding
+// constants in the broker's internal/certinventory package (findings.go and
+// parse.go).
+var findingCodes = map[string]bool{
+	"chain_broken": true, "services_ca_drift": true, "pinned_ca_mismatch": true,
+	"signing_ca_changed": true, "issuer_expires_first": true, "san_mismatch": true,
+	"served_mismatch": true, "deploy_pending": true, "probe_failed": true,
+	"unconverged": true, "patch_reverted": true, "weak_key": true, "weak_signature": true,
+}
+
+const codeWithheld = "(code withheld)"
+
+// listedCode shows the code of a finding or a blocked preview when the
+// broker really sends it, and a fixed placeholder otherwise. A blocked
+// preview carries a code from the broker's internal/apierr package, which
+// brokerCodes lists, and internal/upgrade supplies no other.
+func listedCode(code string) string {
+	if findingCodes[code] || brokerCodes[code] {
+		return code
+	}
+	return codeWithheld
+}
+
 // asSent cleans director text that prints as sent, which skips the secret
 // check. It drops control and format characters, such as an escape sequence
 // or a bidirectional override, so the text cannot steer the terminal, and
