@@ -606,3 +606,11 @@ func TestEveryMonitorStatusTheBrokerWritesPrintsAsSent(t *testing.T) {
 		})
 	}
 }
+
+func TestTheConfirmationPromptLosesControlCharacters(t *testing.T) {
+	r, _, errb := testRunner(newBroker(t, nil).client(), "n\n", false)
+	_ = r.confirm("Delete %s?", "name\x1b[31m\u202eevil")
+	if strings.ContainsAny(errb.String(), "\x1b\u202e") || !strings.Contains(errb.String(), "Delete name") || !strings.Contains(errb.String(), "[y/N]") {
+		t.Errorf("prompt %q", errb)
+	}
+}
