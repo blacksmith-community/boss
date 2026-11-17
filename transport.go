@@ -178,11 +178,22 @@ func (c Client) logURL() string {
 	return u.Redacted()
 }
 
+// parseReason is why a URL did not parse, without the URL. The parse
+// error of the standard library quotes the whole input, userinfo
+// included, so only its cause is kept.
+func parseReason(err error) string {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return ue.Err.Error()
+	}
+	return "it is not valid"
+}
+
 // buildURL joins the broker's base URL with a path that may carry a query.
 func (c Client) buildURL(path string) (string, error) {
 	u, err := url.Parse(strings.TrimSuffix(c.URL, "/"))
 	if err != nil {
-		return "", fmt.Errorf("invalid URL %s: %w", c.logURL(), err)
+		return "", fmt.Errorf("invalid URL %s: %s", c.logURL(), parseReason(err))
 	}
 
 	rel, err := url.Parse(path)

@@ -39,3 +39,27 @@ func TestAFailedRequestHidesTheUserinfoAndQueryOfItsURL(t *testing.T) {
 		}
 	}
 }
+
+func TestABrokerURLThatWillNotParseNeverShowsItsPassword(t *testing.T) {
+	for _, bad := range []string{
+		"http://bob:SECRETPW@host:badport",
+		"http://bob:SECRETPW@host:80/a%zz",
+		"http://bob:SECRETPW@[::1",
+	} {
+		c := &Client{URL: bad, MaxRetries: -1}
+		for name, call := range map[string]func() error{
+			"read":  func() error { _, err := c.Catalog(); return err },
+			"write": func() error { _, err := c.Redeploy(fixtureID, false); return err },
+		} {
+			err := call()
+			if err == nil {
+				t.Fatalf("%s %s: want an error", bad, name)
+			}
+			for _, leak := range []string{"SECRETPW", "bob"} {
+				if strings.Contains(err.Error(), leak) {
+					t.Errorf("%s %s: the error leaks %q: %v", bad, name, leak, err)
+				}
+			}
+		}
+	}
+}
