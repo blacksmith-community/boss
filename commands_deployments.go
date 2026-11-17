@@ -91,6 +91,9 @@ func (r *runner) errand(args, instances []string) error {
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(rest[0]) == "" {
+		return errors.New("the errand name is empty; give the name of an errand from boss deployment errands")
+	}
 	if err := r.confirm("Run errand %s on deployment %s?", rest[0], name); err != nil {
 		return err
 	}

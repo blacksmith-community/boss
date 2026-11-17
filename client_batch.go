@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -94,10 +95,16 @@ func batchPath(id, suffix string) string {
 	return "/b/upgrade/tasks/" + url.PathEscape(id) + suffix
 }
 
+// errEmptyJob stops a batch call that names no job.
+var errEmptyJob = errors.New("the batch job id is empty; give the id of a job from boss batch list")
+
 // BatchTask reads one batch job. For a command job the broker asks for the
 // command key, which the client sends when it has one.
 func (c Client) BatchTask(id string) (BatchJob, error) {
 	var out BatchJob
+	if strings.TrimSpace(id) == "" {
+		return out, errEmptyJob
+	}
 	if _, err := c.request("GET", batchPath(id, ""), nil, &out); err != nil {
 		return out, fmt.Errorf("failed to read batch job %s: %w", id, err)
 	}
@@ -107,6 +114,9 @@ func (c Client) BatchTask(id string) (BatchJob, error) {
 // BatchAction pauses, resumes, or cancels a batch job. action is pause,
 // resume, or cancel, and the answer is the broker's message.
 func (c Client) BatchAction(id, action string) (string, error) {
+	if strings.TrimSpace(id) == "" {
+		return "", errEmptyJob
+	}
 	var out struct {
 		Message string `json:"message"`
 	}

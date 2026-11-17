@@ -157,6 +157,9 @@ func (r *runner) batchShow(args []string) error {
 	if len(args) != 1 {
 		return usageErr("The `job' argument is required.")
 	}
+	if strings.TrimSpace(args[0]) == "" {
+		return errEmptyJob
+	}
 
 	j, err := r.c.BatchTask(args[0])
 	if err != nil {
@@ -201,6 +204,9 @@ func (r *runner) batchShow(args []string) error {
 func (r *runner) batchAction(args []string, action string) error {
 	if len(args) != 1 {
 		return usageErr("The `job' argument is required.")
+	}
+	if strings.TrimSpace(args[0]) == "" {
+		return errEmptyJob
 	}
 
 	if err := r.confirm("%s batch job %s?", strings.ToUpper(action[:1])+action[1:], args[0]); err != nil {

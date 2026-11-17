@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -59,6 +60,9 @@ type ErrandResult struct {
 // RunErrand runs an errand on a deployment, on the named instances when
 // there are any.
 func (c Client) RunErrand(name, errand string, instances []string) (ErrandResult, error) {
+	if strings.TrimSpace(errand) == "" {
+		return ErrandResult{}, errors.New("the errand name is empty; give the name of an errand from boss deployment errands")
+	}
 	path := deploymentPath(name, "/errands/"+url.PathEscape(errand))
 	if len(instances) > 0 {
 		path += "?instances=" + url.QueryEscape(strings.Join(instances, ","))
