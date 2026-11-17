@@ -90,3 +90,40 @@ func TestDeploymentInPath(t *testing.T) {
 		}
 	}
 }
+
+func TestTheBrokersReasonFollowsBossOwnSentence(t *testing.T) {
+	e := NotManagedError{Deployment: "fixture-dep", Message: "the broker will not change it"}
+	got := e.Error()
+	want := "the broker does not manage deployment fixture-dep, so it refused the request. The broker said: the broker will not change it"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if bare := (NotManagedError{Deployment: "fixture-dep"}).Error(); strings.Contains(bare, "said") {
+		t.Errorf("an empty message adds nothing: %q", bare)
+	}
+}
+
+func TestTheBrokersReasonShowsNoCredentialsOrControlCharacters(t *testing.T) {
+	e := NotManagedError{Deployment: "d", Message: "see https://alice:hunter2@host.example/p?token=s3cret\nnow\x1b[31m"}
+	got := e.Error()
+	for _, leak := range []string{"alice", "hunter2", "s3cret", "token", "\n", "\x1b"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("the message leaks %q: %q", leak, got)
+		}
+	}
+	if !strings.Contains(got, "host.example/p") {
+		t.Errorf("the message lost the URL host and path: %q", got)
+	}
+}
+
+func TestTheBrokersRealReasonReachesTheOperator(t *testing.T) {
+	b := newBroker(t, nil)
+	b.status("POST /b/deployments/fixture-dep/restart", 403, "deployment_not_managed.json")
+	r, _, _ := testRunner(b.client(), "", true)
+	r.rawDeployment = "fixture-dep"
+
+	err := r.deploymentOp(nil, "restart")
+	if err == nil || !strings.Contains(err.Error(), "will not change it") {
+		t.Fatalf("got %v, want the broker's reason", err)
+	}
+}

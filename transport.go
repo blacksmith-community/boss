@@ -13,12 +13,14 @@ import (
 	"net/http/httptrace"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
+	"unicode"
 )
 
 // commandKeyHeader carries the second credential a broker asks for before
@@ -598,10 +600,30 @@ type NotManagedError struct {
 }
 
 func (e NotManagedError) Error() string {
-	if e.Deployment == "" {
-		return "the broker does not manage that deployment, so it refused the request"
+	msg := "the broker does not manage that deployment, so it refused the request"
+	if e.Deployment != "" {
+		msg = fmt.Sprintf("the broker does not manage deployment %s, so it refused the request", e.Deployment)
 	}
-	return fmt.Sprintf("the broker does not manage deployment %s, so it refused the request", e.Deployment)
+	if why := plainText(e.Message); why != "" {
+		msg += ". The broker said: " + why
+	}
+	return msg
+}
+
+var urlInText = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://\S+`)
+
+// plainText makes text from a server safe to show in one line. A URL in
+// it loses its userinfo, query, and fragment, and a control character,
+// such as a newline or an escape, becomes a space.
+func plainText(s string) string {
+	s = urlInText.ReplaceAllStringFunc(s, scrubURL)
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(s), " ")
 }
 
 // deploymentInPath returns the deployment name from a /b/deployments/NAME/...

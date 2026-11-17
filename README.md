@@ -110,7 +110,7 @@ The other commands follow the broker's own `/b/` routes, and the table shows how
 
 When a broker answers a route with the plain-text 404 `endpoint not found`, Boss names the command and says the broker is too old for it. An ordinary JSON not-found answer, such as an unknown instance, is reported as it is.
 
-A newer broker refuses a deployment action on a deployment it does not manage, and answers 403 with the code `deployment_not_managed`. Boss then says that the broker does not manage that deployment and exits with an error. That covers `boss redeploy`, including its fallback on an older broker, and every `--deployment` command.
+A newer broker refuses a deployment action on a deployment it does not manage, and answers 403 with the code `deployment_not_managed`. Boss then says that the broker does not manage that deployment and exits with an error, and it adds the broker's own reason, which tells us whether the broker refused to show or to change the deployment. The reason is printed as plain text, with any URL in it stripped of its userinfo and query. That covers `boss redeploy`, including its fallback on an older broker, and every `--deployment` command.
 
 The certificate commands need the certificate inventory switched on in the broker. When it is off, the broker answers with an `inventory_disabled` refusal and Boss prints it.
 
