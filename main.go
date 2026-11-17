@@ -33,6 +33,9 @@ var opt struct {
 	Username          string `cli:"-u, --username" env:"BLACKSMITH_USERNAME"`
 	Password          string `cli:"-p, --password" env:"BLACKSMITH_PASSWORD"`
 
+	Org   string `cli:"--org" env:"BLACKSMITH_ORG"`
+	Space string `cli:"--space" env:"BLACKSMITH_SPACE"`
+
 	Yes bool `cli:"-y, --yes"`
 
 	Log struct {
@@ -109,6 +112,11 @@ func options() {
 	fmt.Printf("\n")
 	fmt.Printf("  -h, --help      Show options and usage.  Can be set on a\n")
 	fmt.Printf("                  per-command basis for more help.\n")
+	fmt.Printf("\n")
+	fmt.Printf("  --org NAME      Organization sent when creating an instance.\n")
+	fmt.Printf("                  Defaults to @W{$BLACKSMITH_ORG}, then @W{boss}\n")
+	fmt.Printf("  --space NAME    Space sent when creating an instance.\n")
+	fmt.Printf("                  Defaults to @W{$BLACKSMITH_SPACE}, then @W{boss}\n")
 	fmt.Printf("\n")
 	fmt.Printf("  -y, --yes       Do not ask before a command changes anything.\n")
 	fmt.Printf("\n")
@@ -210,6 +218,8 @@ func connect() *Client {
 		InsecureSkipVerify: opt.SkipSSLValidation,
 		Debug:              opt.Debug,
 		Trace:              opt.Trace,
+		Org:                opt.Org,
+		Space:              opt.Space,
 	}
 }
 
