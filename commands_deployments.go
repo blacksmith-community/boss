@@ -121,5 +121,15 @@ func (r *runner) errand(args, instances []string) error {
 			_, _ = io.WriteString(r.out, strings.TrimRight(e.Stderr, "\n")+"\n")
 		}
 	}
+
+	failed := res.ExitCode
+	for _, e := range res.Results {
+		if failed == 0 {
+			failed = e.ExitCode
+		}
+	}
+	if failed != 0 {
+		return fmt.Errorf("errand %s exited with %d", res.Errand, failed)
+	}
 	return nil
 }

@@ -200,3 +200,31 @@ func TestDeploymentFlagNamesADirectorDeploymentOutright(t *testing.T) {
 		t.Error("an instance argument was accepted next to --deployment")
 	}
 }
+
+func TestErrandThatFailsExitsNonZeroAndSaysWhy(t *testing.T) {
+	b := deployBroker(t)
+	b.status("POST /b/deployments/"+fixtureDeployment+"/errands/smoke-tests", 200, "errand_failed.json")
+	r, out, _ := testRunner(b.client(), "", true)
+
+	err := r.errand([]string{fixtureID, "smoke-tests"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "exited with 1") {
+		t.Fatalf("got %v, want an error naming the exit code", err)
+	}
+	for _, want := range []string{"fixture check failed", "fixture stderr"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestErrandThatPassesOrIsSkippedSucceeds(t *testing.T) {
+	for _, file := range []string{"errand_result.json", "errand_skipped.json"} {
+		b := deployBroker(t)
+		b.status("POST /b/deployments/"+fixtureDeployment+"/errands/smoke-tests", 200, file)
+		r, _, _ := testRunner(b.client(), "", true)
+
+		if err := r.errand([]string{fixtureID, "smoke-tests"}, nil); err != nil {
+			t.Errorf("%s: %v", file, err)
+		}
+	}
+}
