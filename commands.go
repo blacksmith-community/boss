@@ -80,9 +80,38 @@ func (r *runner) printf(format string, args ...interface{}) {
 	_, _ = fmt.Fprintf(r.out, format, args...)
 }
 
+// eventKey identifies one task event, so a log that restarts with a new
+// task shows the new events and never repeats the old ones.
+func eventKey(e TaskEvent) string {
+	return fmt.Sprintf("%d|%s|%s|%d|%s", e.Time.UnixNano(), e.Stage, e.Task, e.Index, e.State)
+}
+
+// settled reports whether every step in the log has finished, which means
+// the task has nothing more to say.
+func settled(events []TaskEvent) bool {
+	last := map[string]string{}
+	for _, e := range events {
+		last[e.Stage+"|"+e.Task+"|"+fmt.Sprint(e.Index)] = e.State
+	}
+	for _, state := range last {
+		if state != "finished" {
+			return false
+		}
+	}
+	return len(last) > 0
+}
+
 // followEvents prints the events of an instance's task log as they
-// arrive, until the context ends. printed counts the events already shown.
-func (r *runner) followEvents(id string, printed int) error {
+// arrive. shown holds the events already printed. It stops when a step
+// fails, when every step has finished and nothing new has come for two
+// reads, or when the context ends.
+func (r *runner) followEvents(id string, shown []TaskEvent) error {
+	seen := map[string]bool{}
+	for _, e := range shown {
+		seen[eventKey(e)] = true
+	}
+
+	quiet := 0
 	for {
 		select {
 		case <-r.ctx.Done():
@@ -95,8 +124,27 @@ func (r *runner) followEvents(id string, printed int) error {
 			return err
 		}
 
-		for ; printed < len(events); printed++ {
-			r.printf("%s\n", events[printed])
+		fresh := 0
+		for _, e := range events {
+			if seen[eventKey(e)] {
+				continue
+			}
+			seen[eventKey(e)] = true
+			fresh++
+			r.printf("%s\n", e)
+
+			if e.State == "failed" || e.Error != nil {
+				return fmt.Errorf("the task failed at %s", e.Task)
+			}
+		}
+
+		switch {
+		case fresh > 0:
+			quiet = 0
+		case settled(events):
+			if quiet++; quiet >= 2 {
+				return nil
+			}
 		}
 	}
 }
@@ -142,7 +190,7 @@ func (r *runner) task(args []string, follow bool) error {
 	}
 
 	if follow {
-		return r.followEvents(id, len(events))
+		return r.followEvents(id, events)
 	}
 	return nil
 }
@@ -301,7 +349,7 @@ func (r *runner) create(args []string, id, paramValue string, follow bool) error
 	r.printf("%s/%s instance %s created.\n", l[0], l[1], id)
 	if follow {
 		r.printf("\ntailing deployment task log...\n")
-		return r.followEvents(id, 0)
+		return r.followEvents(id, nil)
 	}
 	return nil
 }
@@ -358,7 +406,7 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 	r.printf("Service instance %s updating.\n", ref.ID)
 	if follow {
 		r.printf("\ntailing deployment task log...\n")
-		return r.followEvents(ref.ID, 0)
+		return r.followEvents(ref.ID, nil)
 	}
 	return nil
 }
