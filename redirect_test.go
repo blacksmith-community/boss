@@ -173,3 +173,75 @@ func TestAPostOnAReusedConnectionThatResetsIsNotSentAgain(t *testing.T) {
 		t.Errorf("the POST was sent %d times, want 1", n)
 	}
 }
+
+// movedOnTheSameHost starts a broker whose every route for method answers
+// status and a Location on the same host, and records what reaches the
+// target.
+func movedOnTheSameHost(t *testing.T, method string, status int) (*fakeBroker, *int32) {
+	t.Helper()
+
+	var reached int32
+	b := newBroker(t, nil)
+	b.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/moved":
+			atomic.AddInt32(&reached, 1)
+			w.WriteHeader(200)
+			_, _ = w.Write([]byte(`{}`))
+		case r.Method == method:
+			w.Header().Set("Location", "/moved")
+			w.WriteHeader(status)
+		default:
+			b.serve(w, r)
+		}
+	})
+	return b, &reached
+}
+
+func TestAnActionIsNeverTurnedIntoARead(t *testing.T) {
+	for _, method := range []string{http.MethodPost, http.MethodDelete, http.MethodPut, http.MethodPatch} {
+		for _, status := range []int{301, 302, 303, 307, 308} {
+			b, reached := movedOnTheSameHost(t, method, status)
+
+			_, _, err := b.client().rawRequest(method, "/v2/service_instances/"+fixtureID, map[string]string{"k": "v"})
+			if err == nil || !strings.Contains(err.Error(), "redirect") {
+				t.Errorf("%s %d: want the redirect refused, got %v", method, status, err)
+			}
+			if atomic.LoadInt32(reached) != 0 {
+				t.Errorf("%s %d: the redirect target was reached", method, status)
+			}
+		}
+	}
+}
+
+func TestARedirectKeepingTheHostButChangingTheSchemeIsRefused(t *testing.T) {
+	b := newBroker(t, nil)
+	b.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Same host and port, other scheme.
+		host := strings.TrimPrefix(b.srv.URL, "http://")
+		w.Header().Set("Location", "https://"+host+"/v2/catalog")
+		w.WriteHeader(302)
+	})
+
+	if _, err := b.client().Catalog(); err == nil || !strings.Contains(err.Error(), "scheme or the host") {
+		t.Errorf("want the scheme change refused, got %v", err)
+	}
+}
+
+func TestARedirectChainStopsAtTenHops(t *testing.T) {
+	var hits int32
+	b := newBroker(t, nil)
+	b.srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.Header().Set("Location", "/v2/catalog")
+		w.WriteHeader(302)
+	})
+
+	_, err := b.client().Catalog()
+	if err == nil || !strings.Contains(err.Error(), "too many redirects") {
+		t.Fatalf("want too many redirects, got %v", err)
+	}
+	if n := atomic.LoadInt32(&hits); n != 10 {
+		t.Errorf("the chain was followed %d times, want 10 requests", n)
+	}
+}
