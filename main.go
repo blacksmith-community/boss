@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"strings"
 
 	fmt "github.com/jhunt/go-ansi"
 	"github.com/jhunt/go-cli"
@@ -35,6 +36,8 @@ var opt struct {
 
 	Org   string `cli:"--org" env:"BLACKSMITH_ORG"`
 	Space string `cli:"--space" env:"BLACKSMITH_SPACE"`
+
+	CommandKey string `cli:"--command-key" env:"BLACKSMITH_COMMAND_KEY"`
 
 	Yes bool `cli:"-y, --yes"`
 
@@ -85,6 +88,14 @@ var opt struct {
 		} `cli:"cancel"`
 	} `cli:"tasks"`
 
+	Batch struct {
+		List   struct{} `cli:"list, ls"`
+		Show   struct{} `cli:"show"`
+		Pause  struct{} `cli:"pause"`
+		Resume struct{} `cli:"resume"`
+		Cancel struct{} `cli:"cancel"`
+	} `cli:"batch"`
+
 	Manifest struct{} `cli:"manifest"`
 
 	Creds struct{} `cli:"creds"`
@@ -132,6 +143,9 @@ func options() {
 	fmt.Printf("                  Defaults to @W{$BLACKSMITH_ORG}, then @W{boss}\n")
 	fmt.Printf("  --space NAME    Space sent when creating an instance.\n")
 	fmt.Printf("                  Defaults to @W{$BLACKSMITH_SPACE}, then @W{boss}\n")
+	fmt.Printf("\n")
+	fmt.Printf("  --command-key   Second credential for batch command jobs.\n")
+	fmt.Printf("                  Defaults to @W{$BLACKSMITH_COMMAND_KEY}.  Never logged.\n")
 	fmt.Printf("\n")
 	fmt.Printf("  -y, --yes       Do not ask before a command changes anything.\n")
 	fmt.Printf("\n")
@@ -198,6 +212,20 @@ func tasks_options() {
 	fmt.Printf("\n")
 }
 
+func batch_options() {
+	fmt.Printf("Subcommands:\n")
+	fmt.Printf("\n")
+	fmt.Printf("  @G{batch list}    List batch jobs.\n")
+	fmt.Printf("  @G{batch show}    Show one job and its instances.\n")
+	fmt.Printf("  @G{batch pause}   Pause a running job, after asking.\n")
+	fmt.Printf("  @G{batch resume}  Resume a paused job, after asking.  Resuming a command\n")
+	fmt.Printf("                  job needs @W{--command-key} when the broker has one set.\n")
+	fmt.Printf("  @G{batch cancel}  Cancel a running or paused job, after asking.\n")
+	fmt.Printf("\n")
+	fmt.Printf("Boss does not start batch jobs yet.\n")
+	fmt.Printf("\n")
+}
+
 func task_options() {
 	fmt.Printf("Command Options:\n")
 	fmt.Printf("\n")
@@ -244,6 +272,7 @@ func connect() *Client {
 		InsecureSkipVerify: opt.SkipSSLValidation,
 		Debug:              opt.Debug,
 		Trace:              opt.Trace,
+		CommandKey:         opt.CommandKey,
 		Org:                opt.Org,
 		Space:              opt.Space,
 	}
@@ -511,6 +540,25 @@ func main() {
 			finish(command, r.tasksOutput(args, opt.Tasks.Output.Type))
 		case "tasks cancel":
 			finish(command, r.tasksCancel(args, opt.Tasks.Cancel.Force))
+		}
+		os.Exit(0)
+
+	case "batch", "batch list", "batch show", "batch pause", "batch resume", "batch cancel":
+		if opt.Help || command == "batch" {
+			usage("@C{batch} @M{list|show|pause|resume|cancel} [options]")
+			batch_options()
+			options()
+			os.Exit(0)
+		}
+
+		r := newRunner(connect(), ctx)
+		switch command {
+		case "batch list":
+			finish(command, r.batchList(args))
+		case "batch show":
+			finish(command, r.batchShow(args))
+		default:
+			finish(command, r.batchAction(args, strings.TrimPrefix(command, "batch ")))
 		}
 		os.Exit(0)
 

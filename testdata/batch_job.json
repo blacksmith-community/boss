@@ -1,0 +1,22 @@
+{
+  "id": "job-aaaa-0001",
+  "name": "fixture stemcell upgrade",
+  "kind": "upgrade",
+  "status": "running",
+  "paused": false,
+  "target_stemcell": {"os": "ubuntu-noble", "version": "1.2.3"},
+  "target_releases": [{"name": "redis", "version": "9.9.9"}],
+  "instances": [
+    {"instance_id": "11111111-aaaa-bbbb-cccc-000000000001", "deployment_name": "small-11111111-aaaa-bbbb-cccc-000000000001", "status": "success", "bosh_task_id": 4300},
+    {"instance_id": "11111111-aaaa-bbbb-cccc-000000000002", "deployment_name": "large-11111111-aaaa-bbbb-cccc-000000000002", "status": "failed", "bosh_task_id": 4301, "error": "fixture deploy failure"}
+  ],
+  "total_count": 2,
+  "completed_count": 1,
+  "failed_count": 1,
+  "cancelled_count": 0,
+  "skipped_count": 0,
+  "unknown_count": 0,
+  "created_at": "2026-11-02T09:00:00Z",
+  "created_by": "fixture-admin",
+  "command": {"text": "fixture-command-text-never-printed"}
+}
