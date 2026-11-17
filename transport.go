@@ -672,13 +672,6 @@ const reasonWithheld = "The broker gave a reason that may hold a secret, so Boss
 // that holds one anywhere, in any case, is not shown.
 var riskyWords = []string{"pass", "pw", "pwd", "secret", "token", "key", "auth", "credential", "cookie", "bearer"}
 
-// reasonText cleans the broker's reason for display. It fails closed.
-// Control and format characters become spaces first, and then a reason
-// that might hold a secret is withheld entirely, because no pattern can
-// list every shape a secret takes. That means any of = @ % " { or //,
-// a letter outside ASCII, or any risky word, which over-withholds and is meant to. The second
-// result says whether the reason was withheld. A reason that is shown
-// is on one line and cut at 512 runes.
 // shownReason is the text of a reason the server gave, or the fixed
 // sentence when it may hold a secret. Every place that prints server text
 // as a reason goes through it.
@@ -687,7 +680,32 @@ func shownReason(s string) string {
 	return shown
 }
 
+// fixedBrokerReasons are reasons the broker sends word for word, and each
+// is shown in full even though the check would withhold it. A reason must
+// equal an entry exactly, with the ends trimmed and the case kept, so text
+// added to an entry is checked like any other. The entries come from the
+// broker's handlers, and the file of each is named beside it.
+var fixedBrokerReasons = map[string]bool{
+	// internal/handlers/blacksmith/handler.go
+	"unauthorized log file access": true,
+	// internal/handlers/blacksmith/handler.go
+	"vault_max_versions must be between 0 and 1000 (0 = unlimited)": true,
+	// internal/handlers/services/redis/handler.go
+	"credentials not found": true,
+}
+
+// reasonText cleans the broker's reason for display. It fails closed.
+// Control and format characters become spaces first, and then a reason
+// that might hold a secret is withheld entirely, because no pattern can
+// list every shape a secret takes. That means any of = @ % " { or //,
+// a letter outside ASCII, or any risky word, which over-withholds and is meant to. The second
+// result says whether the reason was withheld. A reason that is shown
+// is on one line and cut at 512 runes.
+// A reason that is one of the fixed broker reasons is shown as it is.
 func reasonText(s string) (string, bool) {
+	if fixedBrokerReasons[strings.TrimSpace(s)] {
+		return strings.TrimSpace(s), false
+	}
 	spaced := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '

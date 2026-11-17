@@ -139,3 +139,28 @@ func TestScrubURLDropsPathParameters(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestAFixedBrokerReasonIsShownOnlyWhenItMatchesExactly(t *testing.T) {
+	for _, in := range []string{
+		"unauthorized log file access",
+		"credentials not found",
+		"vault_max_versions must be between 0 and 1000 (0 = unlimited)",
+		"  credentials not found\n",
+	} {
+		if shown, withheld := reasonText(in); withheld || shown != strings.TrimSpace(in) {
+			t.Errorf("%q: got %q (withheld %v)", in, shown, withheld)
+		}
+	}
+	for name, in := range map[string]string{
+		"an extra word":     "unauthorized log file access now",
+		"a leading word":    "the unauthorized log file access",
+		"another case":      "Unauthorized log file access",
+		"an extra marker":   "credentials not found=1",
+		"a split character": "credentials not\u200b found",
+		"a prefix":          "credentials not",
+	} {
+		if shown, withheld := reasonText(in); !withheld || shown != reasonWithheld {
+			t.Errorf("%s: %q was shown as %q", name, in, shown)
+		}
+	}
+}
