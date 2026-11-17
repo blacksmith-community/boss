@@ -57,6 +57,11 @@ func TestAReasonWithALookalikeLetterIsWithheld(t *testing.T) {
 		"a Braille blank split":     "pa\u2800ss hunter2",
 		"a Hangul filler split":     "pa\u3164ss hunter2",
 		"a Braille blank in a word": "tok\u2800en hunter2",
+		"an acute accent split":     "pa\u0301ss hunter2",
+		"an enclosing mark split":   "pa\u20ddss hunter2",
+		"a variation selector":      "pa\ufe0fss hunter2",
+		"a grapheme joiner":         "pa\u034fss hunter2",
+		"a double breve split":      "pa\u0361ss hunter2",
 	} {
 		shown, withheld := reasonText(in)
 		if !withheld || shown != reasonWithheld {

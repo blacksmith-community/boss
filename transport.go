@@ -737,9 +737,11 @@ func reasonText(s string) (string, bool) {
 	spaced = strings.Join(strings.Fields(spaced), " ")
 
 	// The same text with those characters deleted shows a word that was
-	// split in two to get past the check.
+	// split in two to get past the check. A combining mark, a variation
+	// selector, and the grapheme joiner (U+034F) are all in the Mn or Me
+	// category, so they go too.
 	joined := strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2800' || r == '\u3164' {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || unicode.In(r, unicode.Mn, unicode.Me) || r == '\u2800' || r == '\u3164' {
 			return -1
 		}
 		return r
