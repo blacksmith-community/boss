@@ -35,11 +35,11 @@ A fresh run differs from the committed files only in values that come from the c
 
 The fixtures cover shapes and status codes. They do not cover timing, because the handlers ran against a scripted director that answers at once. They also cannot show how the broker behaves under load or across a restart.
 
-One file is a slice of a real response. The file `task_log_first.json` holds the first event of `task_log.json`, and the follow test uses it to stand for the answer a task gives early in its run.
+Three files have no generator, because none of them is a whole answer from the broker. The file `task_log_first.json` is a slice we cut by hand from the regenerated `task_log.json`. It holds the first event only, and the follow test uses it to stand for the answer a task gives early in its run, which no single broker call produces. If the generated `task_log.json` changes, we cut the slice again from its first event.
 
 A few tests change a recorded response in memory and say so where they do. One adds `plan_updateable` to the catalog, because the broker never sets it, and others mark a step of the task log as failed or move its times to a later day.
 
-The file `params.json` and its twin `params.yml` are inputs that we hand to Boss, so they are not broker responses.
+The files `params.json` and `params.yml` are hand-written. They are inputs that we hand to Boss, so they are not broker responses and no broker could generate them. They hold the same values in the two formats, and the parameter tests read both.
 
 ## Where each group came from
 
