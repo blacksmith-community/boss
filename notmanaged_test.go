@@ -71,3 +71,22 @@ func TestOnlyTheCodeMakesAnAnswerNotManaged(t *testing.T) {
 		}
 	}
 }
+
+func TestDeploymentInPath(t *testing.T) {
+	for path, want := range map[string]string{
+		"/b/deployments/fixture-dep/restart":     "fixture-dep",
+		"/b/deployments/fixture-dep":             "fixture-dep",
+		"/b/deployments/fixture-dep?x=1":         "fixture-dep",
+		"/b/deployments/fixture-dep/errands?x=1": "fixture-dep",
+		"/b/deployments/my%20dep%2Fone/restart":  "my dep/one",
+		"/b/deployments/bad%zzname/restart":      "bad%zzname",
+		"/b/" + fixtureID + "/restart":           "",
+		"/b/deployments/":                        "",
+		"/b/deployments":                         "",
+		"/v2/service_instances/" + fixtureID:     "",
+	} {
+		if got := deploymentInPath(path); got != want {
+			t.Errorf("%s: got %q, want %q", path, got, want)
+		}
+	}
+}
