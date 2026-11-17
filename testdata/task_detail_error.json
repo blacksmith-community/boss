@@ -1,0 +1,15 @@
+{
+  "task": {
+    "id": 5101,
+    "state": "error",
+    "description": "create deployment 'fixture-other'",
+    "timestamp": 1793610000,
+    "started_at": "2026-11-02T09:00:00Z",
+    "ended_at": "2026-11-02T09:01:35Z",
+    "result": "fixture failure text",
+    "error": "fixture failure text",
+    "user": "fixture-director-user",
+    "deployment": "fixture-other"
+  },
+  "events": []
+}

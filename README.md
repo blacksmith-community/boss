@@ -42,7 +42,7 @@ Every command accepts `-h` for its own help. Where a command takes an instance, 
 | `boss task INSTANCE` | Prints the latest BOSH deployment task of an instance, and follows it with `-f` |
 | `boss manifest INSTANCE` | Prints the BOSH manifest of an instance |
 | `boss creds INSTANCE` | Prints the credentials of an instance |
-| `boss redeploy INSTANCE` | Recreates the VMs of an instance, or restarts its jobs with `--restart` |
+| `boss redeploy INSTANCE` | Recreates the VMs of an instance, or restarts its jobs with `--restart`, and waits for the task with `-f` |
 | `boss tasks list` | Lists BOSH tasks, with `--type` set to `recent`, `current`, or `all`, plus `--state`, `--limit`, and `--offset` |
 | `boss tasks output TASK` | Prints the output of a BOSH task, with `--type` set to `task`, `debug`, `result`, or `event` |
 | `boss tasks cancel TASK` | Cancels a BOSH task, and `--force` passes the broker's force option |
@@ -122,7 +122,7 @@ The certificate commands need the certificate inventory switched on in the broke
 
 - Batch command jobs ask for a second credential. Give it with `BLACKSMITH_COMMAND_KEY` or `--command-key-file` before we run `boss batch show` or `boss batch resume` on one.
 
-- Following a task with `-f` stops with an error when a step fails, and it stops quietly once every step has finished and nothing new arrives.
+- Following with `-f` waits for the real state of the work and never guesses from the log. A create or an update reads the broker's last operation answer, and a redeploy or `boss task -f` reads the BOSH task itself until it is done, failed, cancelled, or timed out. The task log only shows what is happening, so a task that waits behind a lock, or goes quiet between stages, keeps the follow running. The command exits with an error when the work fails, and it exits with status 130 when we press Ctrl-C, because the work is then still running at the broker.
 
 ## Not yet supported
 
@@ -168,7 +168,7 @@ tailing deployment task log...
 03:26:18 | Creating missing vms: standalone/58bdb1b3 (0) finished
 ```
 
-We can recreate the VMs of an instance, and then follow the task the director started:
+We can recreate the VMs of an instance, and then follow the task the director started. The `boss redeploy --follow` form does both steps in one command.
 
 ```
 → boss redeploy relaxed-tesla

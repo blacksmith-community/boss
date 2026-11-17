@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": 5102,
+    "state": "done",
+    "description": "create deployment 'fixture-dep'",
+    "timestamp": 1793610000,
+    "started_at": "2026-11-02T09:00:00Z",
+    "ended_at": "2026-11-02T09:01:35Z",
+    "result": "/deployments/fixture-dep",
+    "user": "fixture-director-user",
+    "deployment": "fixture-dep"
+  },
+  "events": []
+}

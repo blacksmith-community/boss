@@ -155,6 +155,7 @@ var opt struct {
 
 	Redeploy struct {
 		Restart bool `cli:"--restart"`
+		Follow  bool `cli:"-f, --follow"`
 	} `cli:"redeploy"`
 }
 
@@ -375,6 +376,7 @@ func redeploy_options() {
 	fmt.Printf("Command Options:\n")
 	fmt.Printf("\n")
 	fmt.Printf("  --restart       Restart the jobs, instead of recreating the VMs\n")
+	fmt.Printf("  -f, --follow    Wait for the BOSH task, and fail if it fails\n")
 	fmt.Printf("\n")
 }
 
@@ -444,7 +446,7 @@ func finish(command string, err error) {
 	}
 
 	_, _ = fmt.Fprintf(os.Stderr, "@R{!!! %s}\n", err)
-	os.Exit(1)
+	os.Exit(exitCode(err))
 }
 
 func main() {
@@ -824,7 +826,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		finish("redeploy", newRunner(connect(ctx), ctx).redeploy(args, opt.Redeploy.Restart))
+		finish("redeploy", newRunner(connect(ctx), ctx).redeploy(args, opt.Redeploy.Restart, opt.Redeploy.Follow))
 		os.Exit(0)
 
 	case "creds":

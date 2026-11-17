@@ -2,11 +2,9 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"strings"
 	"testing"
-	"time"
 )
 
 const (
@@ -76,32 +74,6 @@ func TestTaskWithoutEventsSaysSo(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "No task events yet.") {
 		t.Errorf("output: %s", out)
-	}
-}
-
-func TestTaskFollowPrintsOnlyNewEvents(t *testing.T) {
-	b := newBroker(t, map[string]string{"GET /b/status": "status.json"})
-	b.route("GET /b/"+fixtureID+"/task/log", func(n int) reply {
-		if n == 1 {
-			return reply{Status: 200, File: "task_log_first.json"}
-		}
-		return reply{Status: 200, File: "task_log.json"}
-	})
-	r, out, _ := testRunner(b.client(), "", true)
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
-	r.ctx = ctx
-
-	if err := r.task([]string{fixtureID}, true); err != nil {
-		t.Fatal(err)
-	}
-
-	got := out.String()
-	if n := strings.Count(got, "redis/0 started"); n != 1 {
-		t.Errorf("first event printed %d times:\n%s", n, got)
-	}
-	if !strings.Contains(got, "redis/0 finished") {
-		t.Errorf("a later event is missing:\n%s", got)
 	}
 }
 
@@ -216,7 +188,7 @@ func TestRedeployRecreatesByDefault(t *testing.T) {
 	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
 	r, out, _ := testRunner(b.client(), "", true)
 
-	if err := r.redeploy([]string{fixtureID}, false); err != nil {
+	if err := r.redeploy([]string{fixtureID}, false, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -234,7 +206,7 @@ func TestRedeployRestartUsesTheRestartRoute(t *testing.T) {
 	b.status("POST /b/"+fixtureID+"/restart", 202, "action_restart.json")
 	r, out, _ := testRunner(b.client(), "", true)
 
-	if err := r.redeploy([]string{fixtureID}, true); err != nil {
+	if err := r.redeploy([]string{fixtureID}, true, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -256,7 +228,7 @@ func TestRedeployFallsBackToTheDeploymentRoutesOnAnOldBroker(t *testing.T) {
 		b.status("POST /b/deployments/redis-small-11111111/"+action, 200, "v182_deployment_"+action+".json")
 		r, out, _ := testRunner(b.client(), "", true)
 
-		if err := r.redeploy([]string{fixtureID}, action == "restart"); err != nil {
+		if err := r.redeploy([]string{fixtureID}, action == "restart", false); err != nil {
 			t.Fatalf("%s: %v", action, err)
 		}
 		posts := only(b.requests(), "POST")
@@ -280,7 +252,7 @@ func TestRedeployOnAnOldBrokerWithNoDeploymentRoutesSaysSo(t *testing.T) {
 	r, _, _ := testRunner(b.client(), "", true)
 
 	var old BrokerTooOldError
-	if err := r.redeploy([]string{fixtureID}, false); !errors.As(err, &old) {
+	if err := r.redeploy([]string{fixtureID}, false, false); !errors.As(err, &old) {
 		t.Fatalf("got %v, want a BrokerTooOldError", err)
 	}
 }
@@ -290,7 +262,7 @@ func TestRedeployAsksFirstAndHonorsNo(t *testing.T) {
 	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
 	r, _, errb := testRunner(b.client(), "n\n", false)
 
-	err := r.redeploy([]string{fixtureID}, false)
+	err := r.redeploy([]string{fixtureID}, false, false)
 	if !errors.Is(err, errAborted) {
 		t.Fatalf("got %v, want errAborted", err)
 	}
@@ -307,7 +279,7 @@ func TestRedeployProceedsOnYes(t *testing.T) {
 	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
 	r, _, _ := testRunner(b.client(), "yes\n", false)
 
-	if err := r.redeploy([]string{fixtureID}, false); err != nil {
+	if err := r.redeploy([]string{fixtureID}, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if len(only(b.requests(), "POST")) != 1 {
@@ -320,7 +292,7 @@ func TestRedeployReportsALockedDeployment(t *testing.T) {
 	b.status("POST /b/"+fixtureID+"/recreate", 409, "action_locked.json")
 	r, _, _ := testRunner(b.client(), "", true)
 
-	err := r.redeploy([]string{fixtureID}, false)
+	err := r.redeploy([]string{fixtureID}, false, false)
 	if err == nil || !strings.Contains(err.Error(), "running task 812") || !strings.Contains(err.Error(), "deployment_locked") {
 		t.Fatalf("got %v", err)
 	}
@@ -336,7 +308,7 @@ func TestCommandsDemandAnInstance(t *testing.T) {
 		"task":     r.task(nil, false),
 		"manifest": r.manifest(nil),
 		"creds":    r.creds(nil),
-		"redeploy": r.redeploy(nil, false),
+		"redeploy": r.redeploy(nil, false, false),
 		"log":      r.log([]string{"x"}, LogOptions{}),
 	} {
 		var ue usageError

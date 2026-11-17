@@ -1,0 +1,13 @@
+{
+  "task": {
+    "id": 5103,
+    "state": "processing",
+    "description": "run errand smoke-tests from deployment fixture-dep",
+    "timestamp": 1793610600,
+    "started_at": "2026-11-02T09:10:00Z",
+    "user": "fixture-director-user",
+    "deployment": "fixture-dep",
+    "context_id": "fixture-context"
+  },
+  "events": []
+}

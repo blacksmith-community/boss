@@ -86,65 +86,121 @@ func eventKey(e TaskEvent) string {
 	return fmt.Sprintf("%d|%s|%s|%d|%s", e.Time.UnixNano(), e.Stage, e.Task, e.Index, e.State)
 }
 
-// settled reports whether every step in the log has finished, which means
-// the task has nothing more to say.
-func settled(events []TaskEvent) bool {
-	last := map[string]string{}
-	for _, e := range events {
-		last[e.Stage+"|"+e.Task+"|"+fmt.Sprint(e.Index)] = e.State
-	}
-	for _, state := range last {
-		if state != "finished" {
-			return false
-		}
-	}
-	return len(last) > 0
+// pollFunc reads the real state of an operation. It answers done once the
+// operation has ended, with an error when it ended badly. An error with
+// done false means the state could not be read, which also stops a follow.
+type pollFunc func() (done bool, err error)
+
+// interruptedError is what Ctrl-C during a follow leaves behind. The work
+// goes on at the broker, so the message says how to pick it up again.
+type interruptedError struct{ id string }
+
+func (e interruptedError) Error() string {
+	return fmt.Sprintf("interrupted; the work is still running on the broker, so follow it again with: boss task --follow %s", e.id)
 }
 
-// followEvents prints the events of an instance's task log as they
-// arrive. shown holds the events already printed. It stops when a step
-// fails, when every step has finished and nothing new has come for two
-// reads, or when the context ends.
-func (r *runner) followEvents(id string, shown []TaskEvent) error {
+// exitCode is the process exit status for the result of a command.
+func exitCode(err error) int {
+	var in interruptedError
+	switch {
+	case err == nil:
+		return 0
+	case errors.As(err, &in):
+		return 130
+	}
+	return 1
+}
+
+// operationProgress follows an instance operation through the OSB
+// last_operation answer, which is what create and update wait on.
+func (r *runner) operationProgress(id string) pollFunc {
+	return func() (bool, error) {
+		op, err := r.c.LastOperation(id)
+		switch {
+		case errors.Is(err, ErrInstanceGone):
+			return true, fmt.Errorf("instance %s is gone, so the operation cannot finish", id)
+		case err != nil:
+			return true, err
+		}
+
+		switch op.State {
+		case "in progress":
+			return false, nil
+		case "succeeded":
+			return true, nil
+		case "failed":
+			return true, fmt.Errorf("the operation failed: %s", op.Description)
+		}
+		return true, fmt.Errorf("the broker reported the unknown state %q for the operation", op.State)
+	}
+}
+
+// taskProgress follows one BOSH task through the broker's task route.
+func (r *runner) taskProgress(taskID int) pollFunc {
+	return func() (bool, error) {
+		task, err := r.c.Task(taskID)
+		if err != nil {
+			return true, err
+		}
+
+		switch task.State {
+		case "done":
+			return true, nil
+		case "error", "cancelled", "timeout":
+			why := task.Error
+			if why == "" {
+				why = task.Result
+			}
+			if why != "" {
+				why = ": " + why
+			}
+			return true, fmt.Errorf("BOSH task %d ended as %s%s", taskID, task.State, why)
+		}
+		// queued, processing, cancelling, and any state not known yet
+		return false, nil
+	}
+}
+
+// follow prints the events of an instance's task log as they arrive and
+// ends only when the operation itself has ended, which p decides from the
+// broker's real state. The log is for display. It can lag behind, show an
+// earlier finished task, or go quiet between stages, so it never ends the
+// follow. shown holds the events already printed. Ctrl-C ends the follow
+// with an interrupt error, because the operation is not finished.
+func (r *runner) follow(id string, shown []TaskEvent, p pollFunc) error {
 	seen := map[string]bool{}
 	for _, e := range shown {
 		seen[eventKey(e)] = true
 	}
 
-	quiet := 0
+	show := func() {
+		events, err := r.c.TaskEvents(id)
+		if err != nil {
+			return
+		}
+		for _, e := range events {
+			if !seen[eventKey(e)] {
+				seen[eventKey(e)] = true
+				r.printf("%s\n", e)
+			}
+		}
+	}
+
 	for {
 		select {
 		case <-r.ctx.Done():
-			return nil
+			return interruptedError{id: id}
 		case <-time.After(r.poll):
 		}
 
-		events, err := r.c.TaskEvents(id)
-		if err != nil {
+		show()
+		done, err := p()
+		if r.ctx.Err() != nil {
+			return interruptedError{id: id}
+		}
+		if done || err != nil {
+			show()
 			return err
-		}
-
-		fresh := 0
-		for _, e := range events {
-			if seen[eventKey(e)] {
-				continue
-			}
-			seen[eventKey(e)] = true
-			fresh++
-			r.printf("%s\n", e)
-
-			if e.State == "failed" || e.Error != nil {
-				return fmt.Errorf("the task failed at %s", e.Task)
-			}
-		}
-
-		switch {
-		case fresh > 0:
-			quiet = 0
-		case settled(events):
-			if quiet++; quiet >= 2 {
-				return nil
-			}
 		}
 	}
 }
@@ -164,17 +220,19 @@ func (r *runner) log(args []string, o LogOptions) error {
 	return nil
 }
 
-// task prints the deployment task log of an instance, and keeps printing
-// when follow is set.
+// task prints the deployment task log of an instance. With follow it then
+// waits for the task the deployment is running now, which it finds through
+// the broker's task list, and it fails when that task fails.
 func (r *runner) task(args []string, follow bool) error {
 	if len(args) != 1 {
 		return usageErr("The `instance' argument is required.")
 	}
 
-	id, err := r.c.Resolve(args[0])
+	ref, err := r.c.Lookup(args[0])
 	if err != nil {
 		return err
 	}
+	id := ref.ID
 
 	events, err := r.c.TaskEvents(id)
 	if err != nil {
@@ -189,10 +247,38 @@ func (r *runner) task(args []string, follow bool) error {
 		r.printf("%s\n", e)
 	}
 
-	if follow {
-		return r.followEvents(id, events)
+	if !follow {
+		return nil
 	}
-	return nil
+
+	taskID, err := r.currentTask(ref.DeploymentName)
+	if err != nil {
+		return err
+	}
+	if taskID == 0 {
+		r.printf("No task is running for deployment %s.\n", ref.DeploymentName)
+		return nil
+	}
+
+	r.printf("\nfollowing BOSH task %d...\n", taskID)
+	return r.follow(id, events, r.taskProgress(taskID))
+}
+
+// currentTask finds the newest task that is queued or running on a
+// deployment. It answers 0 when there is none.
+func (r *runner) currentTask(deployment string) (int, error) {
+	list, err := r.c.Tasks(TaskFilter{Type: "current"})
+	if err != nil {
+		return 0, err
+	}
+
+	newest := 0
+	for _, t := range list.Tasks {
+		if t.Deployment == deployment && t.ID > newest {
+			newest = t.ID
+		}
+	}
+	return newest, nil
 }
 
 // manifest prints the BOSH deployment manifest of an instance.
@@ -237,7 +323,7 @@ func (r *runner) creds(args []string) error {
 }
 
 // redeploy recreates the VMs of an instance, or restarts their jobs.
-func (r *runner) redeploy(args []string, restart bool) error {
+func (r *runner) redeploy(args []string, restart, follow bool) error {
 	if len(args) != 1 {
 		return usageErr("The `instance' argument is required.")
 	}
@@ -263,8 +349,17 @@ func (r *runner) redeploy(args []string, restart bool) error {
 
 	r.printf("# %s\n", id)
 	r.printf("%s of deployment %s started as BOSH task %d (%s).\n", res.Operation, res.Deployment, res.TaskID, res.State)
-	r.printf("Follow it with: boss task --follow %s\n", id)
-	return nil
+
+	if !follow {
+		r.printf("Follow it with: boss redeploy --follow %s, or boss task --follow %s\n", args[0], id)
+		return nil
+	}
+	if res.TaskID == 0 {
+		return errors.New("the broker gave no task to follow")
+	}
+
+	r.printf("\nfollowing BOSH task %d...\n", res.TaskID)
+	return r.follow(id, nil, r.taskProgress(res.TaskID))
 }
 
 // parseParams reads provisioning or update parameters. A value that
@@ -367,7 +462,7 @@ func (r *runner) create(args []string, id, paramValue string, follow bool) error
 	r.printf("%s/%s instance %s created.\n", l[0], l[1], id)
 	if follow {
 		r.printf("\ntailing deployment task log...\n")
-		return r.followEvents(id, nil)
+		return r.follow(id, nil, r.operationProgress(id))
 	}
 	return nil
 }
@@ -424,7 +519,7 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 	r.printf("Service instance %s updating.\n", ref.ID)
 	if follow {
 		r.printf("\ntailing deployment task log...\n")
-		return r.followEvents(ref.ID, nil)
+		return r.follow(ref.ID, nil, r.operationProgress(ref.ID))
 	}
 	return nil
 }

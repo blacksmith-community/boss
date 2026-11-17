@@ -679,3 +679,25 @@ func (c Client) redeployThroughTheDeployment(id, action string) (ActionResult, e
 	}
 	return ActionResult{InstanceID: id, Deployment: res.Deployment, Operation: res.Operation, TaskID: res.TaskID, State: res.State}, nil
 }
+
+// OperationStatus is the answer to an OSB last_operation poll.
+type OperationStatus struct {
+	State       string `json:"state"`
+	Description string `json:"description"`
+}
+
+// LastOperation reads the state of the latest operation on an instance
+// from the OSB last_operation route. A 410 means the instance is gone.
+func (c Client) LastOperation(id string) (OperationStatus, error) {
+	var out OperationStatus
+	_, err := c.request("GET", "/v2/service_instances/"+url.PathEscape(id)+"/last_operation", nil, &out)
+
+	var api APIError
+	if errors.As(err, &api) && api.Status == http.StatusGone {
+		return out, fmt.Errorf("failed to read the operation of %s: %w", id, ErrInstanceGone)
+	}
+	if err != nil {
+		return out, fmt.Errorf("failed to read the operation of %s: %w", id, err)
+	}
+	return out, nil
+}

@@ -161,3 +161,15 @@ func decodeTaskOutput(b []byte) (string, error) {
 	}
 	return sb.String(), nil
 }
+
+// Task reads one BOSH task from GET /b/tasks/{id}. The broker also sends
+// the task's events, which Boss does not need here.
+func (c Client) Task(id int) (BoshTask, error) {
+	var out struct {
+		Task BoshTask `json:"task"`
+	}
+	if _, err := c.request("GET", "/b/tasks/"+strconv.Itoa(id), nil, &out); err != nil {
+		return BoshTask{}, fmt.Errorf("failed to read BOSH task %d: %w", id, err)
+	}
+	return out.Task, nil
+}

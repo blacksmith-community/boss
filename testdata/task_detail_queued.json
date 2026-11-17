@@ -1,0 +1,12 @@
+{
+  "task": {
+    "id": 5104,
+    "state": "queued",
+    "description": "create deployment 'fixture-dep'",
+    "timestamp": 1793611200,
+    "started_at": "2026-11-02T09:20:00Z",
+    "user": "fixture-director-user",
+    "deployment": "fixture-dep"
+  },
+  "events": []
+}
