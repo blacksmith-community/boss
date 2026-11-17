@@ -607,7 +607,9 @@ func commandKey(key, file string) (string, error) {
 // does not manage. Older brokers never send this code.
 type NotManagedError struct {
 	Deployment string
-	Message    string
+	// Message is the text of the broker's error field. It comes from the
+	// server, so it is cleaned by plainText before anyone sees it.
+	Message string
 }
 
 func (e NotManagedError) Error() string {
@@ -621,20 +623,46 @@ func (e NotManagedError) Error() string {
 	return msg
 }
 
-var urlInText = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://\S+`)
+var (
+	urlInText = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://\S+`)
+
+	// bareUserinfo is user:password@ with no scheme in front, which is
+	// also what is left of a network-path reference such as //user:pw@host.
+	bareUserinfo = regexp.MustCompile(`[^\s/@:]+:[^\s/@]+@`)
+
+	// secretPair is a key=value pair whose key names a secret, such as
+	// password, passwd, secret, token, or key, alone or inside a longer
+	// name like api_key or access_token.
+	secretPair = regexp.MustCompile(`(?i)\b([a-z0-9_.-]*(?:password|passwd|secret|token|key)[a-z0-9_.-]*)=[^\s&;,)\]"']+`)
+)
+
+// maxReason is the most runes of a server's reason that an error shows.
+const maxReason = 512
 
 // plainText makes text from a server safe to show in one line. A URL in
-// it loses its userinfo, query, and fragment, and a control character,
-// such as a newline or an escape, becomes a space.
+// it loses its userinfo, path parameters, query, and fragment, user:pw@
+// userinfo and the value of a secret-looking key=value pair are hidden,
+// a control or format character, such as a newline, an escape, or a
+// right-to-left override, becomes a space, and a long text is cut.
 func plainText(s string) string {
-	s = urlInText.ReplaceAllStringFunc(s, scrubURL)
+	s = urlInText.ReplaceAllStringFunc(s, func(m string) string {
+		core := strings.TrimRight(m, ")],.;:!?\"'>")
+		return scrubURL(core) + m[len(core):]
+	})
+	s = bareUserinfo.ReplaceAllString(s, "")
+	s = secretPair.ReplaceAllString(s, "$1=[hidden]")
 	s = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
 		}
 		return r
 	}, s)
-	return strings.Join(strings.Fields(s), " ")
+	s = strings.Join(strings.Fields(s), " ")
+
+	if runes := []rune(s); len(runes) > maxReason {
+		s = string(runes[:maxReason]) + "…"
+	}
+	return s
 }
 
 // deploymentInPath returns the deployment name from a /b/deployments/NAME/...
@@ -662,8 +690,20 @@ func scrubURL(raw string) string {
 		return "[unparsable URL]"
 	}
 	u.User = nil
+	u.Path = withoutPathParameters(u.Path)
+	u.RawPath = ""
 	u.RawQuery = ""
 	u.ForceQuery = false
 	u.Fragment = ""
 	return u.String()
+}
+
+// withoutPathParameters drops the ;name=value parameters that a path
+// segment can carry, because a server may put a session token there.
+func withoutPathParameters(path string) string {
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		segments[i], _, _ = strings.Cut(segment, ";")
+	}
+	return strings.Join(segments, "/")
 }
