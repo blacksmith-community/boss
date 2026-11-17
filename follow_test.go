@@ -75,7 +75,7 @@ func TestFollowWaitsForTheOperationWhileTheLogShowsAnOldFinishedTask(t *testing.
 	r, cancel := followRunner(t, b)
 	defer cancel()
 
-	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID)); err != nil {
+	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{})); err != nil {
 		t.Fatal(err)
 	}
 	if *polls != 9 {
@@ -91,7 +91,7 @@ func TestFollowSurvivesAGapBetweenStages(t *testing.T) {
 	r, cancel := followRunner(t, b)
 	defer cancel()
 
-	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID)); err != nil {
+	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{})); err != nil {
 		t.Fatal(err)
 	}
 	if *polls != 31 {
@@ -105,7 +105,7 @@ func TestFollowFailsWhenTheOperationFailsEvenIfTheLogLooksFinished(t *testing.T)
 	r, cancel := followRunner(t, b)
 	defer cancel()
 
-	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID))
+	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{}))
 	if err == nil || !strings.Contains(err.Error(), "fixture failure text") {
 		t.Fatalf("got %v, want the operation's failure", err)
 	}
@@ -117,7 +117,7 @@ func TestFollowFailsWhenTheInstanceIsGone(t *testing.T) {
 	r, cancel := followRunner(t, b)
 	defer cancel()
 
-	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID))
+	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{}))
 	if err == nil {
 		t.Fatal("a gone instance is not a success")
 	}
@@ -129,7 +129,7 @@ func TestFollowFailsWhenTheStateCannotBeRead(t *testing.T) {
 	r, cancel := followRunner(t, b)
 	defer cancel()
 
-	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID)); err == nil {
+	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{})); err == nil {
 		t.Fatal("an unreadable state must not end as a success")
 	}
 }
@@ -142,7 +142,7 @@ func TestFollowStillShowsTheLogAsDisplay(t *testing.T) {
 	out := &strings.Builder{}
 	r.out = out
 
-	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID)); err != nil {
+	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{})); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "redis/0 started") {
@@ -158,7 +158,7 @@ func TestFollowKeepsGoingWhenTheLogCannotBeRead(t *testing.T) {
 	r, cancel := followRunner(t, b)
 	defer cancel()
 
-	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID)); err != nil {
+	if err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{})); err != nil {
 		t.Fatalf("got %v, want success from the state alone", err)
 	}
 }
@@ -174,7 +174,7 @@ func TestControlCDuringAFollowIsAnInterruptNotASuccess(t *testing.T) {
 		cancel()
 	}()
 
-	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID))
+	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{}))
 	var in interruptedError
 	if !errors.As(err, &in) {
 		t.Fatalf("got %v, want an interrupt", err)
@@ -224,7 +224,7 @@ func TestFollowShowsTheEventsOfANewTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.follow(fixtureID, events, r.operationProgress(fixtureID)); err != nil {
+	if err := r.follow(fixtureID, events, r.operationProgress(fixtureID, OperationRef{})); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "redis/1 started") || strings.Contains(out.String(), "redis/0") {
@@ -399,7 +399,7 @@ func TestFollowStopsAtTheTimeoutAndSaysTheWorkIsStillRunning(t *testing.T) {
 	r.c.Timeout = 150 * time.Millisecond
 
 	start := time.Now()
-	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID))
+	err := r.follow(fixtureID, nil, r.operationProgress(fixtureID, OperationRef{}))
 	if err == nil {
 		t.Fatal("a follow that never finishes must end with an error")
 	}

@@ -199,10 +199,13 @@ func (c Catalog) Plan(service, plan string) (*Service, *Plan, error) {
 
 // Instance represents a service instance
 type Instance struct {
-	ID        string    `json:"id"`
-	Service   *Service  `json:"service"`
-	Plan      *Plan     `json:"plan"`
-	State     string    `json:"state,omitempty"`
+	ID      string   `json:"id"`
+	Service *Service `json:"service"`
+	Plan    *Plan    `json:"plan"`
+	State   string   `json:"state,omitempty"`
+	// Operation is the token the broker gave for an asynchronous create or
+	// update. It goes back on every last_operation poll.
+	Operation string    `json:"operation,omitempty"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 }
@@ -459,11 +462,12 @@ func (c Client) provisionBody(service, plan string, params map[string]interface{
 func (c Client) Create(id, service, plan string, params map[string]interface{}) (Instance, error) {
 	in := c.provisionBody(service, plan, params)
 
-	_, err := c.request("PUT", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, nil)
+	var out acceptedOperation
+	_, err := c.request("PUT", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, &out)
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to create instance %s: %w", id, err)
 	}
-	return Instance{ID: id}, nil
+	return Instance{ID: id, Operation: out.Operation}, nil
 }
 
 // Update modifies an existing service instance with new parameters or a
@@ -489,7 +493,8 @@ func (c Client) Update(id, service, plan, previousPlan string, params map[string
 		in.Previous = &previous{ServiceID: service, PlanID: previousPlan}
 	}
 
-	_, err := c.request("PATCH", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, nil)
+	var out acceptedOperation
+	_, err := c.request("PATCH", "/v2/service_instances/"+url.PathEscape(id)+"?accepts_incomplete=true", in, &out)
 	var apiErr APIError
 	if errors.As(err, &apiErr) && apiErr.Status == 500 && strings.Contains(apiErr.Description, "not implemented") {
 		return Instance{}, fmt.Errorf("failed to update instance %s: this broker doesn't support updates yet", id)
@@ -497,7 +502,7 @@ func (c Client) Update(id, service, plan, previousPlan string, params map[string
 	if err != nil {
 		return Instance{}, fmt.Errorf("failed to update instance %s: %w", id, err)
 	}
-	return Instance{ID: id}, nil
+	return Instance{ID: id, Operation: out.Operation}, nil
 }
 
 // ErrInstanceGone is what Delete returns when the broker answers 410,
@@ -689,11 +694,35 @@ type OperationStatus struct {
 	Description string `json:"description"`
 }
 
+// acceptedOperation is the body of an OSB 202 answer.
+type acceptedOperation struct {
+	Operation string `json:"operation"`
+}
+
+// OperationRef carries what the OSB specification asks a platform to send
+// back when it polls last_operation. An empty field is left out.
+type OperationRef struct {
+	Operation string
+	ServiceID string
+	PlanID    string
+}
+
 // LastOperation reads the state of the latest operation on an instance
 // from the OSB last_operation route. A 410 means the instance is gone.
-func (c Client) LastOperation(id string) (OperationStatus, error) {
+func (c Client) LastOperation(id string, ref OperationRef) (OperationStatus, error) {
+	q := url.Values{}
+	for key, value := range map[string]string{"operation": ref.Operation, "plan_id": ref.PlanID, "service_id": ref.ServiceID} {
+		if value != "" {
+			q.Set(key, value)
+		}
+	}
+	path := "/v2/service_instances/" + url.PathEscape(id) + "/last_operation"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+
 	var out OperationStatus
-	_, err := c.request("GET", "/v2/service_instances/"+url.PathEscape(id)+"/last_operation", nil, &out)
+	_, err := c.request("GET", path, nil, &out)
 
 	var api APIError
 	if errors.As(err, &api) && api.Status == http.StatusGone {

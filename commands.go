@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -138,9 +139,9 @@ func exitCode(err error) int {
 
 // operationProgress follows an instance operation through the OSB
 // last_operation answer, which is what create and update wait on.
-func (r *runner) operationProgress(id string) pollFunc {
+func (r *runner) operationProgress(id string, ref OperationRef) pollFunc {
 	return pollFunc{what: "the operation on instance " + id, read: func() (bool, error) {
-		op, err := r.c.LastOperation(id)
+		op, err := r.c.LastOperation(id, ref)
 		switch {
 		case errors.Is(err, ErrInstanceGone):
 			return true, fmt.Errorf("instance %s is gone, so the operation cannot finish", id)
@@ -485,14 +486,15 @@ func (r *runner) create(args []string, id, paramValue string, follow bool) error
 		return err
 	}
 
-	if _, err := r.c.Create(id, service.ID, plan.ID, params); err != nil {
+	created, err := r.c.Create(id, service.ID, plan.ID, params)
+	if err != nil {
 		return err
 	}
 
 	r.printf("%s/%s instance %s created.\n", l[0], l[1], id)
 	if follow {
 		r.printf("\ntailing deployment task log...\n")
-		return r.follow(id, nil, r.operationProgress(id))
+		return r.follow(id, nil, r.operationProgress(id, OperationRef{Operation: created.Operation, ServiceID: service.ID, PlanID: plan.ID}))
 	}
 	return nil
 }
@@ -542,14 +544,15 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 		return err
 	}
 
-	if _, err := r.c.Update(ref.ID, ref.ServiceID, planID, ref.PlanID, params); err != nil {
+	updated, err := r.c.Update(ref.ID, ref.ServiceID, planID, ref.PlanID, params)
+	if err != nil {
 		return err
 	}
 
 	r.printf("Service instance %s updating.\n", ref.ID)
 	if follow {
 		r.printf("\ntailing deployment task log...\n")
-		return r.follow(ref.ID, nil, r.operationProgress(ref.ID))
+		return r.follow(ref.ID, nil, r.operationProgress(ref.ID, OperationRef{Operation: updated.Operation, ServiceID: ref.ServiceID, PlanID: cmp.Or(planID, ref.PlanID)}))
 	}
 	return nil
 }
