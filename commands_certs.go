@@ -21,7 +21,7 @@ func certOwners(c Certificate) string {
 		case o.InstanceID != "":
 			names = append(names, o.InstanceID)
 		default:
-			names = append(names, o.Kind)
+			names = append(names, oneOf(o.Kind, ownerKindValues...))
 		}
 	}
 	if len(names) == 0 {
@@ -37,7 +37,7 @@ func (r *runner) certTable(certs []Certificate) {
 		if name == "" {
 			name = c.Variable
 		}
-		rows = append(rows, []string{c.ID, c.Kind, name, c.Expiry, certDays(c), c.Health, certOwners(c)})
+		rows = append(rows, []string{c.ID, oneOf(string(c.Kind), certKindValues...), name, oneOf(c.Expiry, expiryValues...), certDays(c), oneOf(c.Health, healthValues...), certOwners(c)})
 	}
 	r.table([]string{"ID", "Kind", "Name", "Expiry", "Days", "Health", "Owners"}, rows)
 }
@@ -96,18 +96,18 @@ func (r *runner) certShow(args []string) error {
 
 	r.printf("ID:        %s\n", c.ID)
 	r.printf("Key:       %s\n", c.Key)
-	r.printf("Kind:      %s\n", c.Kind)
+	r.printf("Kind:      %s\n", oneOf(string(c.Kind), certKindValues...))
 	r.printf("Name:      %s\n", c.CommonName)
 	r.printf("Issuer:    %s\n", c.Issuer)
 	if c.EffectiveNotAfter != nil {
 		r.printf("Expires:   %s (%s days left)\n", c.EffectiveNotAfter.UTC().Format("2006-01-02"), certDays(c.Certificate))
 	}
-	r.printf("Expiry:    %s\n", c.Expiry)
-	r.printf("Health:    %s\n", c.Health)
+	r.printf("Expiry:    %s\n", oneOf(c.Expiry, expiryValues...))
+	r.printf("Health:    %s\n", oneOf(c.Health, healthValues...))
 	r.printf("Owners:    %s\n", certOwners(c.Certificate))
-	r.printf("Rotation:  allowed=%t modes=%s\n", c.Rotation.Allowed, strings.Join(c.Rotation.Modes, ","))
+	r.printf("Rotation:  allowed=%t modes=%s\n", c.Rotation.Allowed, rotationModeList(c.Rotation.Modes))
 	for _, f := range c.Findings {
-		r.printf("Finding:   [%s] %s: %s\n", f.Severity, listedCode(f.Code), shownReason(f.Message))
+		r.printf("Finding:   [%s] %s: %s\n", oneOf(f.Severity, severityValues...), listedCode(f.Code), shownReason(f.Message))
 	}
 	return nil
 }
@@ -197,7 +197,7 @@ func (r *runner) certPreview(args, variables []string, mode, converge string) er
 
 	r.printf("Preview %s, good until %s. Nothing was changed.\n", p.ID, p.ExpiresAt.UTC().Format("2006-01-02 15:04:05"))
 	for _, i := range p.Instances {
-		r.printf("\nInstance %s (%s), mode %s, %d VMs\n", i.InstanceID, i.InstanceName, i.Mode, i.VMs)
+		r.printf("\nInstance %s (%s), mode %s, %d VMs\n", i.InstanceID, i.InstanceName, oneOf(i.Mode, rotationModes...), i.VMs)
 		for _, v := range i.Selected {
 			r.printf("  rotates %s (%d days left)\n", v.Name, v.DaysLeft)
 		}
@@ -212,4 +212,14 @@ func (r *runner) certPreview(args, variables []string, mode, converge string) er
 		r.printf("\nWarning: %s\n", shownReason(w))
 	}
 	return nil
+}
+
+// rotationModeList joins the rotation modes, showing only the modes the
+// broker offers.
+func rotationModeList(modes []string) string {
+	shown := make([]string, len(modes))
+	for i, m := range modes {
+		shown[i] = oneOf(m, rotationModes...)
+	}
+	return strings.Join(shown, ",")
 }

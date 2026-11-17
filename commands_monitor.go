@@ -39,7 +39,7 @@ func (r *runner) monitor(args []string) error {
 
 	rows := make([][]string, 0, len(m.Services))
 	for _, s := range m.Services {
-		rows = append(rows, []string{s.ServiceID, s.DeploymentName, s.LastStatus, yesNo(s.IsHealthy),
+		rows = append(rows, []string{s.ServiceID, s.DeploymentName, oneOf(s.LastStatus, vmStatuses...), yesNo(s.IsHealthy),
 			strconv.Itoa(s.FailureCount), s.LastCheck.UTC().Format("2006-01-02 15:04:05")})
 	}
 	r.table([]string{"Instance", "Deployment", "Status", "Healthy", "Failures", "Last check"}, rows)

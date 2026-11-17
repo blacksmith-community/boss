@@ -786,6 +786,40 @@ func cell(s string) string {
 	return strings.Join(strings.Fields(asSent(strings.NewReplacer("\n", " ", "\t", " ").Replace(s))), " ")
 }
 
+const valueWithheld = "(value withheld)"
+
+// oneOf shows a value that is empty or one of the values the broker
+// sends in that field, and a fixed placeholder otherwise.
+func oneOf(v string, allowed ...string) string {
+	if v == "" {
+		return v
+	}
+	for _, a := range allowed {
+		if v == a {
+			return v
+		}
+	}
+	return valueWithheld
+}
+
+// Values the broker sends in its enumerated fields. The certificate sets
+// come from internal/certinventory (types.go), the batch sets from
+// internal/upgrade (types.go and cert_types.go), and the monitor set from
+// internal/vmmonitor (monitor.go). The task states are the director's.
+var (
+	expiryValues     = []string{"expired", "critical", "warning", "ok", "unknown"}
+	healthValues     = []string{"error", "warning", "ok", "unknown"}
+	certKindValues   = []string{"ca", "intermediate", "leaf"}
+	ownerKindValues  = []string{"broker", "instance", "platform"}
+	severityValues   = []string{"error", "warning", "info"}
+	batchStatuses    = []string{"pending", "running", "paused", "completed", "failed", "cancelled"}
+	instanceStatuses = []string{"pending", "running", "success", "failed", "cancelled", "skipped", "outcome_unknown", "interrupted", "awaiting_decision"}
+	batchKinds       = []string{"upgrade", "certificates", "command"}
+	vmStatuses       = []string{"running", "failing", "unresponsive agent", "unresponsive", "provisioning", "error"}
+	taskStates       = []string{"queued", "processing", "cancelling", "cancelled", "done", "error", "timeout"}
+	rotationModes    = []string{"redeploy", "patch", "converge"}
+)
+
 // brokerErrorCodes are the short codes the broker puts in the error field
 // of an Open Service Broker answer. They are taken from the osbapi package
 // that the broker vendors, in github.com/fivetwenty-io/osbapi/v2/pkg/osbapi,

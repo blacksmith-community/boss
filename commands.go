@@ -398,7 +398,7 @@ func (r *runner) redeploy(args []string, restart, follow bool) error {
 	}
 
 	r.printf("# %s\n", id)
-	r.printf("%s of deployment %s started as BOSH task %d (%s).\n", res.Operation, res.Deployment, res.TaskID, res.State)
+	r.printf("%s of deployment %s started as BOSH task %d (%s).\n", oneOf(res.Operation, "restart", "recreate", "stop", "start"), res.Deployment, res.TaskID, oneOf(res.State, taskStates...))
 
 	if !follow {
 		r.printf("Follow it with: boss redeploy --follow %s, or boss task --follow %s\n", args[0], id)

@@ -59,7 +59,7 @@ func (r *runner) deploymentOp(args []string, op string) error {
 		return err
 	}
 
-	r.printf("%s of deployment %s started as BOSH task %d (%s).\n", res.Operation, res.Deployment, res.TaskID, res.State)
+	r.printf("%s of deployment %s started as BOSH task %d (%s).\n", oneOf(res.Operation, "restart", "recreate", "stop", "start"), res.Deployment, res.TaskID, oneOf(res.State, taskStates...))
 	return nil
 }
 

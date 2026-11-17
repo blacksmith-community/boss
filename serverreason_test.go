@@ -446,3 +446,44 @@ func TestEveryPrintedStringLosesItsControlCharacters(t *testing.T) {
 		}
 	})
 }
+
+func TestAnEnumeratedFieldPrintsOnlyTheValuesTheBrokerSends(t *testing.T) {
+	for _, v := range []string{"expired", "ok"} {
+		if got := oneOf(v, expiryValues...); got != v {
+			t.Errorf("%s printed as %q", v, got)
+		}
+	}
+	for _, v := range []string{"hunter2", "esc\x1b[31m", "Expired", "two words"} {
+		if got := oneOf(v, expiryValues...); got != valueWithheld {
+			t.Errorf("%q printed as %q", v, got)
+		}
+	}
+	if oneOf("", expiryValues...) != "" {
+		t.Error("an empty value must stay empty")
+	}
+
+	b := newBroker(t, nil)
+	t.Run("a certificate", func(t *testing.T) {
+		body := fixture(t, "cert_item.json")
+		for _, r := range [][2]string{{`"kind": "",`, `"kind": "hunter2",`}, {`"expiry": "warning"`, `"expiry": "hunter2"`}, {`"health": "ok"`, `"health": "hunter2"`}, {`"attention": true,`, `"attention": true, "findings": [{"severity": "hunter2", "code": "weak_key", "message": "m"}],`}, {`"redeploy"`, `"hunter2"`}} {
+			if !strings.Contains(body, r[0]) {
+				t.Fatalf("fixture lacks %s", r[0])
+			}
+			body = strings.Replace(body, r[0], r[1], 1)
+		}
+		b.route("GET /b/certificates/items/c0ffee01", func(int) reply { return reply{Status: 200, Body: body} })
+		r, out, _ := testRunner(b.client(), "", true)
+		_ = r.certShow([]string{"c0ffee01"})
+		if leaks(out.String()) || strings.Count(out.String(), valueWithheld) < 5 {
+			t.Errorf("output %q", out)
+		}
+	})
+	t.Run("a batch job", func(t *testing.T) {
+		body := withText(t, "batch_job.json", `"paused": false,`, `"paused": false, "kind": "hunter2",`)
+		body = strings.Replace(body, `"status": "completed"`, `"status": "hunter2"`, 1)
+		out := batchShowOutput(t, body)
+		if leaks(out) || !strings.Contains(out, valueWithheld) {
+			t.Errorf("output %q", out)
+		}
+	})
+}

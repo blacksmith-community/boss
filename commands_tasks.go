@@ -58,7 +58,7 @@ func (r *runner) tasksList(args []string, f TaskFilter) error {
 	if len(list.Tasks) > 0 {
 		rows := make([][]string, 0, len(list.Tasks))
 		for _, t := range list.Tasks {
-			rows = append(rows, []string{strconv.Itoa(t.ID), t.State, t.Deployment, t.Description, clock(t.StartedAt)})
+			rows = append(rows, []string{strconv.Itoa(t.ID), oneOf(t.State, taskStates...), t.Deployment, t.Description, clock(t.StartedAt)})
 		}
 		r.table([]string{"Task", "State", "Deployment", "Description", "Started"}, rows)
 
@@ -153,7 +153,7 @@ func (r *runner) batchList(args []string) error {
 
 	rows := make([][]string, 0, len(jobs))
 	for _, j := range jobs {
-		rows = append(rows, []string{j.ID, j.Name, batchKind(j.Kind), j.Status, j.Target,
+		rows = append(rows, []string{j.ID, j.Name, oneOf(batchKind(j.Kind), batchKinds...), oneOf(j.Status, batchStatuses...), j.Target,
 			progress(j.CompletedCount, j.TotalCount), strconv.Itoa(j.FailedCount),
 			j.CreatedAt.UTC().Format("2006-01-02 15:04:05")})
 	}
@@ -175,7 +175,7 @@ func (r *runner) batchShow(args []string) error {
 		return err
 	}
 
-	state := j.Status
+	state := oneOf(j.Status, batchStatuses...)
 	if j.Paused {
 		state += " (paused)"
 	}
@@ -183,7 +183,7 @@ func (r *runner) batchShow(args []string) error {
 	if j.Name != "" {
 		r.printf("Name:    %s\n", j.Name)
 	}
-	r.printf("Kind:    %s\n", batchKind(j.Kind))
+	r.printf("Kind:    %s\n", oneOf(batchKind(j.Kind), batchKinds...))
 	r.printf("Status:  %s\n", state)
 	if j.PauseReason != "" {
 		r.printf("Paused:  %s\n", shownReason(j.PauseReason))
@@ -203,7 +203,7 @@ func (r *runner) batchShow(args []string) error {
 		if i.BOSHTaskID > 0 {
 			task = strconv.Itoa(i.BOSHTaskID)
 		}
-		rows = append(rows, []string{i.InstanceID, i.DeploymentName, i.Status, task, shownReason(i.Error)})
+		rows = append(rows, []string{i.InstanceID, i.DeploymentName, oneOf(i.Status, instanceStatuses...), task, shownReason(i.Error)})
 	}
 	r.table([]string{"Instance", "Deployment", "Status", "BOSH task", "Error"}, rows)
 	return nil
