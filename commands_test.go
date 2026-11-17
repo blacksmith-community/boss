@@ -125,7 +125,7 @@ func TestCredsReadsTheCredentialsRoute(t *testing.T) {
 func TestCredsSurfacesABrokerErrorBody(t *testing.T) {
 	b := newBroker(t, map[string]string{
 		"GET /b/status":                        "status.json",
-		"GET /b/" + fixtureID + "/credentials": "credentials_error.json",
+		"GET /b/" + fixtureID + "/credentials": "v182_credentials_error.json",
 	})
 	r, out, _ := testRunner(b.client(), "", true)
 
@@ -141,7 +141,7 @@ func TestCredsSurfacesABrokerErrorBody(t *testing.T) {
 func TestCredsRefusesTheBrokersPlaceholder(t *testing.T) {
 	b := newBroker(t, map[string]string{
 		"GET /b/status":                        "status.json",
-		"GET /b/" + fixtureID + "/credentials": "credentials_placeholder.json",
+		"GET /b/" + fixtureID + "/credentials": "v182_credentials_placeholder.json",
 	})
 	r, out, _ := testRunner(b.client(), "", true)
 
@@ -358,5 +358,30 @@ func TestQueryStringSurvivesOnOSBCalls(t *testing.T) {
 	}
 	if got := b.requests()[0].Path; got != "/v2/service_instances/"+fixtureID+"?accepts_incomplete=true&plan_id=redis-plan&service_id=redis" {
 		t.Errorf("path: %s", got)
+	}
+}
+
+func TestCredsRefusalsFromANewerBrokerAreShownWithTheirReason(t *testing.T) {
+	for file, want := range map[string]string{
+		"credentials_placeholder.json": "nothing is stored for this instance",
+		"credentials_error.json":       "Vault did not answer",
+	} {
+		b := newBroker(t, map[string]string{
+			"GET /b/status": "status.json",
+		})
+		status := 404
+		if file == "credentials_error.json" {
+			status = 503
+		}
+		b.status("GET /b/"+fixtureID+"/credentials", status, file)
+		r, out, _ := testRunner(b.client(), "", true)
+
+		err := r.creds([]string{fixtureID})
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: got %v, want the reason %q", file, err, want)
+		}
+		if out.Len() != 0 {
+			t.Errorf("%s: printed output on a refusal: %s", file, out)
+		}
 	}
 }

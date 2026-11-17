@@ -20,6 +20,7 @@ import (
 	"blacksmith/internal/mutation"
 	"blacksmith/pkg/logger"
 	"blacksmith/pkg/testutil"
+	vaultPkg "blacksmith/pkg/vault"
 	"time"
 )
 
@@ -91,7 +92,12 @@ func TestZZFixtures(t *testing.T) {
 
 	// deployment lifecycle and errands
 	dir := &zzDirector{MockBOSHDirector: testutil.NewMockBOSHDirector(), errands: []bosh.Errand{{Name: "smoke-tests"}, {Name: "cleanup"}}}
-	h := deployments.NewHandler(deployments.Dependencies{Logger: logger.NewNoOpLogger(), Director: dir})
+	// The broker's index lists fixture-dep as the deployment of a service
+	// instance, so the ownership check lets the actions through.
+	index := &testutil.InstanceVault{Instances: map[string]vaultPkg.Instance{
+		"7a1b": {ID: "7a1b", ServiceID: "redis", PlanID: "small", DeploymentName: "fixture-dep"},
+	}}
+	h := deployments.NewHandler(deployments.Dependencies{Logger: logger.NewNoOpLogger(), Director: dir, Vault: index})
 	do := func(method, target string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, target, nil))
@@ -103,7 +109,7 @@ func TestZZFixtures(t *testing.T) {
 	save("errands", "GET /b/deployments/fixture-dep/errands", do("GET", "/b/deployments/fixture-dep/errands"))
 
 	guard := mutation.NewGuard(time.Now)
-	hg := deployments.NewHandler(deployments.Dependencies{Logger: logger.NewNoOpLogger(), Director: dir, Guard: guard})
+	hg := deployments.NewHandler(deployments.Dependencies{Logger: logger.NewNoOpLogger(), Director: dir, Guard: guard, Vault: index})
 	rel, _ := guard.Acquire("", "fixture-dep", mutation.Holder{Kind: mutation.KindDeploymentAction, Description: "restart from the UI"})
 	rec := httptest.NewRecorder()
 	hg.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), "POST", "/b/deployments/fixture-dep/stop", nil))

@@ -63,4 +63,5 @@ if [ -n "$OLD" ]; then
   run "$OLD" internal/handlers/deployments deployments_v182.go "$OUT/v182"
   run "$OLD" internal/handlers/tasks tasks.go "$OUT/v182"
   run "$OLD" internal/api api.go "$OUT/v182"
+  run "$OLD" internal/handlers/services services.go "$OUT/v182"
 fi

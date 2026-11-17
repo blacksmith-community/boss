@@ -2,7 +2,7 @@
 
 Every file here is a response that a real Blacksmith broker handler wrote. None of them is typed by hand. The Go programs in `gen/` made them. Each program runs the broker's own HTTP handlers, with the broker's own response types, against a scripted director and a stubbed vault, and saves each body exactly as the handler sent it.
 
-The programs ran against two broker checkouts. Files without a prefix came from the broker at commit b61f8696, which is the tip of the broker branch that carries the new routes. Files that start with `v182_` came from the broker at the `v1.8.2` tag, so they show how an older broker answers the same routes. The v1.8.2 files cover the status index, the task list, task output, task cancel, the VM monitor, the errand routes, and the deployment recreate, restart, stop, and start routes. Some of the newer routes do not exist there, and the `v182_` files for those routes hold the plain-text 404 that the old router sends.
+The programs ran against two broker checkouts. Files without a prefix came from the broker at commit 9ad1ccd8 of the broker's code branch. One checkout at or after that commit regenerates every file, and it is the one we use, because its ownership check runs ahead of every deployment route. Files that start with `v182_` came from the broker at the `v1.8.2` tag, so they show how an older broker answers the same routes. The v1.8.2 files cover the status index, the instance credentials, the task list, task output, task cancel, the VM monitor, the errand routes, and the deployment recreate, restart, stop, and start routes. Some of the newer routes do not exist there, and the `v182_` files for those routes hold the plain-text 404 that the old router sends.
 
 Identifiers are fixed so the tests can name them. Instance IDs look like `11111111-aaaa-bbbb-cccc-00000000000N`, and secrets are placeholders such as `fixture-not-a-secret`.
 
@@ -81,7 +81,7 @@ The file `params.json` and its twin `params.yml` are inputs that we hand to Boss
 
 - `credentials*.json`, `manifest*.json`, and `logs*.json`
 
-  The credentials, the manifest, and the broker log. The file `credentials_placeholder.json` is what the broker sends when it holds no stored credentials, and it carries a host, a user, and a password that are not real.
+  The credentials, the manifest, and the broker log. The file `v182_credentials_placeholder.json` is what an older broker sends when it holds no stored credentials, and it carries a host, a user, and a password that are not real. A newer broker refuses instead, so `credentials_placeholder.json` is its 404 with the code `not_found`, and `credentials_error.json` is its 503 with the code `vault_unavailable`. The `v182_credentials_error.json` file is the older broker's wording for the same failure.
 
 - `task_detail*.json`
 
