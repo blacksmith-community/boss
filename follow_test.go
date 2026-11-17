@@ -439,3 +439,31 @@ func TestFollowWithNoTimeoutGivesItselfTheLongDefault(t *testing.T) {
 		t.Errorf("limit %s, want the --timeout value", got)
 	}
 }
+
+func TestRedeployFollowDoesNotPrintTheOldTasksLog(t *testing.T) {
+	b := newBroker(t, map[string]string{"GET /b/status": "status.json", "GET /b/" + fixtureID + "/task/log": "task_log.json"})
+	b.status("POST /b/"+fixtureID+"/recreate", 202, "action_recreate.json")
+	taskScript(b, 4321, "task_detail_processing.json", "task_detail_done.json")
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.redeploy([]string{fixtureID}, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "redis/0") {
+		t.Errorf("the log of the task before this one was printed:\n%s", out)
+	}
+}
+
+func TestUpdateFollowDoesNotPrintTheOldTasksLog(t *testing.T) {
+	b := updatableBroker(t)
+	b.route("GET /b/"+fixtureID+"/task/log", func(int) reply { return reply{Status: 200, File: "task_log.json"} })
+	b.status("GET /v2/service_instances/"+fixtureID+"/last_operation", 200, "osb_last_operation_succeeded.json")
+	r, out, _ := testRunner(b.client(), "", true)
+
+	if err := r.update([]string{fixtureID}, `{"k":"v"}`, "", true); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "redis/0") {
+		t.Errorf("the log of the task before this one was printed:\n%s", out)
+	}
+}

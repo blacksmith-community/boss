@@ -187,6 +187,22 @@ func (r *runner) taskProgress(taskID int) pollFunc {
 	}}
 }
 
+// logBefore reads the task log as it stands before a command starts new
+// work, so a follow can leave out the events of the task before it. The
+// log belongs to the instance and not to one task, which means nothing in
+// it says which task wrote an event. It returns nil when no follow is
+// wanted or the log cannot be read.
+func (r *runner) logBefore(id string, follow bool) []TaskEvent {
+	if !follow {
+		return nil
+	}
+	events, err := r.c.TaskEvents(id)
+	if err != nil {
+		return nil
+	}
+	return events
+}
+
 // follow prints the events of an instance's task log as they arrive and
 // ends only when the operation itself has ended, which p decides from the
 // broker's real state. The log is for display. It can lag behind, show an
@@ -373,6 +389,7 @@ func (r *runner) redeploy(args []string, restart, follow bool) error {
 		return err
 	}
 
+	before := r.logBefore(id, follow)
 	res, err := r.c.Redeploy(id, restart)
 	if err != nil {
 		return err
@@ -390,7 +407,7 @@ func (r *runner) redeploy(args []string, restart, follow bool) error {
 	}
 
 	r.printf("\nfollowing BOSH task %d...\n", res.TaskID)
-	return r.follow(id, nil, r.taskProgress(res.TaskID))
+	return r.follow(id, before, r.taskProgress(res.TaskID))
 }
 
 // parseParams reads provisioning or update parameters. A value that
@@ -544,6 +561,7 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 		return err
 	}
 
+	before := r.logBefore(ref.ID, follow)
 	updated, err := r.c.Update(ref.ID, ref.ServiceID, planID, ref.PlanID, params)
 	if err != nil {
 		return err
@@ -552,7 +570,7 @@ func (r *runner) update(args []string, paramValue, planName string, follow bool)
 	r.printf("Service instance %s updating.\n", ref.ID)
 	if follow {
 		r.printf("\ntailing deployment task log...\n")
-		return r.follow(ref.ID, nil, r.operationProgress(ref.ID, OperationRef{Operation: updated.Operation, ServiceID: ref.ServiceID, PlanID: cmp.Or(planID, ref.PlanID)}))
+		return r.follow(ref.ID, before, r.operationProgress(ref.ID, OperationRef{Operation: updated.Operation, ServiceID: ref.ServiceID, PlanID: cmp.Or(planID, ref.PlanID)}))
 	}
 	return nil
 }
