@@ -730,6 +730,7 @@ var brokerCodes = map[string]bool{
 	"rotation_disabled":           true,
 	"signing_ca_changed":          true,
 	"ssh_disabled":                true,
+	"task_not_found":              true,
 	"tasks_loading":               true,
 	"timeout_out_of_range":        true,
 	"unknown_variable":            true,

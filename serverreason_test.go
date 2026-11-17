@@ -340,7 +340,7 @@ func TestTheCodeIsCheckedWhenADescriptionFollowsIt(t *testing.T) {
 }
 
 func TestOnlyABrokerCodePrintsInParentheses(t *testing.T) {
-	for _, code := range []string{"deployment_locked", "instance_not_found", "vault_unavailable", "internal_error", "command_credential_required", "E008"} {
+	for _, code := range []string{"deployment_locked", "instance_not_found", "vault_unavailable", "internal_error", "command_credential_required", "task_not_found", "E008"} {
 		got := APIError{Code: "a message", BrokerCode: code}.Error()
 		if got != "a message ("+code+")" {
 			t.Errorf("%s: got %q", code, got)
@@ -558,6 +558,7 @@ func TestTheCodeListsMatchTheBrokerExactly(t *testing.T) {
 		"rotation_disabled",
 		"signing_ca_changed",
 		"ssh_disabled",
+		"task_not_found",
 		"tasks_loading",
 		"timeout_out_of_range",
 		"unknown_variable",
@@ -623,5 +624,21 @@ func TestAConfirmationPromptStaysOnOneLine(t *testing.T) {
 		if strings.ContainsAny(prompt, "\n\t") || !strings.HasSuffix(prompt, " [y/N] ") {
 			t.Errorf("prompt for %q is %q", name, errb)
 		}
+	}
+}
+
+func TestAnUnknownTaskPrintsTheBrokerMessageAndItsCode(t *testing.T) {
+	b := newBroker(t, nil)
+	b.route("GET /b/tasks/4242/output", func(int) reply {
+		return reply{Status: 404, Body: `{"error":"the director has no task 4242","code":"task_not_found"}`}
+	})
+	r, _, _ := testRunner(b.client(), "", true)
+	err := r.tasksOutput([]string{"4242"}, "")
+	var api APIError
+	if !errors.As(err, &api) || api.Status != 404 {
+		t.Fatalf("err %v", err)
+	}
+	if got := err.Error(); !strings.HasSuffix(got, "the director has no task 4242 (task_not_found)") {
+		t.Errorf("got %q", got)
 	}
 }
