@@ -41,6 +41,8 @@ var opt struct {
 
 	Timeout string `cli:"--timeout" env:"BOSS_TIMEOUT"`
 
+	RawDeployment string `cli:"--deployment"`
+
 	Yes bool `cli:"-y, --yes"`
 
 	Log struct {
@@ -209,6 +211,9 @@ func options() {
 	fmt.Printf("                  Defaults to @W{$BOSS_TIMEOUT}, then 30s for a read and 15m\n")
 	fmt.Printf("                  for errands, restarts, and recreates\n")
 	fmt.Printf("\n")
+	fmt.Printf("  --deployment NAME  Act on a director deployment by its own name, for\n")
+	fmt.Printf("                  the deployment commands, when no instance owns it.\n")
+	fmt.Printf("\n")
 	fmt.Printf("  -y, --yes       Do not ask before a command changes anything.\n")
 	fmt.Printf("\n")
 	fmt.Printf("  -D, --debug     Enable debugging output.\n")
@@ -309,7 +314,9 @@ func certificates_options() {
 }
 
 func deployment_options() {
-	fmt.Printf("Each subcommand takes a deployment name, or an instance ID.\n")
+	fmt.Printf("Each subcommand takes an instance ID or name.  To act on a director\n")
+	fmt.Printf("deployment that no instance owns, leave the instance out and pass\n")
+	fmt.Printf("--deployment NAME.\n")
 	fmt.Printf("\n")
 	fmt.Printf("Subcommands:\n")
 	fmt.Printf("\n")

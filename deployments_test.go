@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func TestDeploymentOpsPostToTheirRoutes(t *testing.T) {
 		b.status("POST /b/deployments/"+fixtureDeployment+"/"+op, 200, "deployment_recreate.json")
 		r, out, _ := testRunner(b.client(), "", true)
 
-		if err := r.deploymentOp([]string{fixtureDeployment}, op); err != nil {
+		if err := r.deploymentOp([]string{fixtureID}, op); err != nil {
 			t.Fatalf("%s: %v", op, err)
 		}
 		if posts := only(b.requests(), "POST"); len(posts) != 1 || posts[0].Body != "" {
@@ -52,7 +53,7 @@ func TestDeploymentOpsAskFirst(t *testing.T) {
 		b.status("POST /b/deployments/"+fixtureDeployment+"/"+op, 200, "deployment_recreate.json")
 		r, _, errb := testRunner(b.client(), "n\n", false)
 
-		if err := r.deploymentOp([]string{fixtureDeployment}, op); !errors.Is(err, errAborted) {
+		if err := r.deploymentOp([]string{fixtureID}, op); !errors.Is(err, errAborted) {
 			t.Fatalf("%s: %v", op, err)
 		}
 		if len(only(b.requests(), "POST")) != 0 {
@@ -69,7 +70,7 @@ func TestDeploymentOpReportsABusyDeployment(t *testing.T) {
 	b.status("POST /b/deployments/"+fixtureDeployment+"/restart", 409, "deployment_busy.json")
 	r, _, _ := testRunner(b.client(), "", true)
 
-	err := r.deploymentOp([]string{fixtureDeployment}, "restart")
+	err := r.deploymentOp([]string{fixtureID}, "restart")
 	if err == nil || !strings.Contains(err.Error(), "instance_busy") {
 		t.Fatalf("got %v", err)
 	}
@@ -82,7 +83,7 @@ func TestErrandsListsNames(t *testing.T) {
 	b := deployBroker(t)
 	r, out, _ := testRunner(b.client(), "", true)
 
-	if err := r.errands([]string{fixtureDeployment}); err != nil {
+	if err := r.errands([]string{fixtureID}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "smoke-tests\ncleanup\n") {
@@ -95,7 +96,7 @@ func TestErrandRunsAndShowsOutput(t *testing.T) {
 	b.status("POST /b/deployments/"+fixtureDeployment+"/errands/smoke-tests", 200, "errand_result.json")
 	r, out, _ := testRunner(b.client(), "", true)
 
-	if err := r.errand([]string{fixtureDeployment, "smoke-tests"}, []string{"standalone/aaaaaaaa", "other/1"}); err != nil {
+	if err := r.errand([]string{fixtureID, "smoke-tests"}, []string{"standalone/aaaaaaaa", "other/1"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,7 +115,7 @@ func TestErrandSkippedAndAskFirst(t *testing.T) {
 	b.status("POST /b/deployments/"+fixtureDeployment+"/errands/smoke-tests", 200, "errand_skipped.json")
 
 	r, _, _ := testRunner(b.client(), "n\n", false)
-	if err := r.errand([]string{fixtureDeployment, "smoke-tests"}, nil); !errors.Is(err, errAborted) {
+	if err := r.errand([]string{fixtureID, "smoke-tests"}, nil); !errors.Is(err, errAborted) {
 		t.Fatalf("got %v", err)
 	}
 	if len(only(b.requests(), "POST")) != 0 {
@@ -122,7 +123,7 @@ func TestErrandSkippedAndAskFirst(t *testing.T) {
 	}
 
 	r, out, _ := testRunner(b.client(), "", true)
-	if err := r.errand([]string{fixtureDeployment, "smoke-tests"}, nil); err != nil {
+	if err := r.errand([]string{fixtureID, "smoke-tests"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "was skipped") {
@@ -138,10 +139,64 @@ func TestErrandOutputIsNeverLogged(t *testing.T) {
 	c.Debug, c.Stderr = true, &logged
 	r, _, _ := testRunner(c, "", true)
 
-	if err := r.errand([]string{fixtureDeployment, "smoke-tests"}, nil); err != nil {
+	if err := r.errand([]string{fixtureID, "smoke-tests"}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(logged.String(), "fixture stdout text") {
+	if strings.Contains(logged.String(), "all fixture checks passed") {
 		t.Errorf("errand output leaked:\n%s", logged.String())
+	}
+}
+
+func TestDeploymentOpRefusesARawNameWithoutTheFlag(t *testing.T) {
+	b := deployBroker(t)
+	b.status("POST /b/deployments/"+fixtureDeployment+"/stop", 200, "deployment_stop.json")
+	r, _, _ := testRunner(b.client(), "", true)
+
+	err := r.deploymentOp([]string{fixtureDeployment}, "stop")
+	if err == nil || !strings.Contains(err.Error(), "--deployment "+fixtureDeployment) {
+		t.Fatalf("got %v, want a hint about --deployment", err)
+	}
+	if len(only(b.requests(), "POST")) != 0 {
+		t.Error("a POST went out for a name the index lacks")
+	}
+}
+
+func TestDeploymentOpRefusesWhenTheLookupFails(t *testing.T) {
+	b := deployBroker(t)
+	b.status("GET /b/status", 500, "action_unknown.json")
+	b.status("POST /b/deployments/"+fixtureDeployment+"/stop", 200, "deployment_stop.json")
+	r, _, _ := testRunner(b.client(), "", true)
+
+	if err := r.deploymentOp([]string{fixtureID}, "stop"); err == nil {
+		t.Fatal("the command went ahead without an index")
+	}
+	if len(only(b.requests(), "POST")) != 0 {
+		t.Error("a POST went out after a failed lookup")
+	}
+}
+
+func TestDeploymentFlagNamesADirectorDeploymentOutright(t *testing.T) {
+	b := deployBroker(t)
+	b.status("POST /b/deployments/raw-dep/stop", 200, "deployment_stop.json")
+	b.status("POST /b/deployments/raw-dep/errands/smoke-tests", 200, "errand_result.json")
+	r, _, errb := testRunner(b.client(), "", false)
+	r.in = bufio.NewReader(strings.NewReader("yes\nyes\n"))
+	r.rawDeployment = "raw-dep"
+
+	if err := r.deploymentOp(nil, "stop"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.errand([]string{"smoke-tests"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(errb.String(), "raw-dep") {
+		t.Errorf("the prompt does not name the deployment: %s", errb)
+	}
+	if len(only(b.requests(), "GET")) != 0 {
+		t.Errorf("the flag still looked the name up: %+v", b.requests())
+	}
+
+	if err := r.deploymentOp([]string{fixtureID}, "stop"); err == nil {
+		t.Error("an instance argument was accepted next to --deployment")
 	}
 }

@@ -279,6 +279,10 @@ func (c Client) statusIndex() (map[string]statusEntry, error) {
 	return out.Instances, nil
 }
 
+// ErrNoInstance is what Lookup wraps when the broker's index has no
+// instance with the ID or name it was given.
+var ErrNoInstance = errors.New("no instance has the ID or name")
+
 // Lookup finds an instance by its exact ID or its exact name. It never
 // matches a prefix or a substring, because the commands that change an
 // instance act on whatever it returns.
@@ -311,7 +315,7 @@ func (c Client) Lookup(want string) (InstanceRef, error) {
 
 	switch len(matches) {
 	case 0:
-		return InstanceRef{}, fmt.Errorf("no instance has the ID or name '%s'", want)
+		return InstanceRef{}, fmt.Errorf("%w '%s'", ErrNoInstance, want)
 	case 1:
 		return pick(matches[0], index[matches[0]]), nil
 	default:

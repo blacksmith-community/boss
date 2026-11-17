@@ -36,6 +36,8 @@ type runner struct {
 	err io.Writer
 	// yes skips the confirmation of a change.
 	yes bool
+	// rawDeployment is a director deployment named with --deployment.
+	rawDeployment string
 	// poll is how often a followed task is read again.
 	poll time.Duration
 }
@@ -49,6 +51,8 @@ func newRunner(c *Client, ctx context.Context) *runner {
 		err:  os.Stderr,
 		yes:  opt.Yes,
 		poll: time.Second,
+
+		rawDeployment: opt.RawDeployment,
 	}
 }
 
