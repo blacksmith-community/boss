@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -61,5 +63,32 @@ func TestABrokerURLThatWillNotParseNeverShowsItsPassword(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestScrubURLDropsEveryPartThatCanCarryASecret(t *testing.T) {
+	for in, want := range map[string]string{
+		"http://u:p@host:8080/a/b?q=1#frag": "http://host:8080/a/b",
+		"http://host/a#only-a-fragment":     "http://host/a",
+		"http://host/a?":                    "http://host/a",
+		"http://host/a":                     "http://host/a",
+	} {
+		if got := scrubURL(in); got != want {
+			t.Errorf("%s: got %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestARefusedRedirectIsNotRetriedEvenWhenAnotherCauseIsRetryable(t *testing.T) {
+	refusal := RedirectError{Method: "GET", Target: "http://other.example/", Reason: "it changes the scheme or the host"}
+	err := errors.Join(refusal, &net.OpError{Op: "read", Err: timeoutError{}})
+
+	for _, method := range []string{"GET", "HEAD", "POST"} {
+		if (Client{}).shouldRetry(method, err) {
+			t.Errorf("%s: a refused redirect was set to be retried", method)
+		}
+	}
+	if !(Client{}).shouldRetry("GET", &net.OpError{Op: "read", Err: timeoutError{}}) {
+		t.Error("the retryable cause alone should be retried, or this test proves nothing")
 	}
 }
