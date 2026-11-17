@@ -121,8 +121,8 @@ func TestUpdateSendsParameters(t *testing.T) {
 }
 
 // updatableCatalog is the recorded catalog with plan_updateable switched
-// on and the instance's own plan added. The broker never sets that field,
-// so the recorded catalog alone cannot show the path that allows a change.
+// on. The broker never sets that field, so the recorded catalog alone
+// cannot show the path that allows a change.
 func updatableCatalog(t *testing.T) string {
 	t.Helper()
 
@@ -132,7 +132,6 @@ func updatableCatalog(t *testing.T) string {
 	}
 	svc := cat["services"].([]interface{})[0].(map[string]interface{})
 	svc["plan_updateable"] = true
-	svc["plans"] = append(svc["plans"].([]interface{}), map[string]interface{}{"id": "redis-plan", "name": "standalone", "description": "fixture plan"})
 
 	out, err := json.Marshal(cat)
 	if err != nil {

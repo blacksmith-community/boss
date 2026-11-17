@@ -1,10 +1,22 @@
 # Test fixtures
 
-Every file here is a response that a real Blacksmith broker handler wrote. None of them is typed by hand. We produced them with a throwaway Go program that sat outside this repository and was never committed. The program ran the broker's own HTTP handlers, with the broker's own response types, against a scripted director and a stubbed vault, and it saved each body exactly as the handler sent it.
+Every file here is a response that a real Blacksmith broker handler wrote. None of them is typed by hand. The Go programs in `gen/` made them. Each program runs the broker's own HTTP handlers, with the broker's own response types, against a scripted director and a stubbed vault, and saves each body exactly as the handler sent it.
 
-The program ran twice. Files without a prefix came from the broker at commit b61f8696, which is the tip of the broker branch that carries the new routes. Files that start with `v182_` came from the broker at the `v1.8.2` tag, so they show how an older broker answers the same routes. Some of the newer routes do not exist there, and the `v182_` files for those routes hold the plain-text 404 that the old router sends.
+The programs ran against two broker checkouts. Files without a prefix came from the broker at commit b61f8696, which is the tip of the broker branch that carries the new routes. Files that start with `v182_` came from the broker at the `v1.8.2` tag, so they show how an older broker answers the same routes. The v1.8.2 files cover the status index, the task list, task output, task cancel, the VM monitor, the errand routes, and the deployment recreate, restart, stop, and start routes. Some of the newer routes do not exist there, and the `v182_` files for those routes hold the plain-text 404 that the old router sends.
 
 Identifiers are fixed so the tests can name them. Instance IDs look like `11111111-aaaa-bbbb-cccc-00000000000N`, and secrets are placeholders such as `fixture-not-a-secret`.
+
+## Regenerating the files
+
+The programs in `gen/` carry the `ignore` build tag, so the Go toolchain skips them here. The script `gen/run.sh` lays each one over the broker with `go test -overlay`, which means it never writes inside either broker checkout. It needs a checkout of the broker at the commit we want, and it takes an optional second checkout at the `v1.8.2` tag.
+
+```
+testdata/gen/run.sh /path/to/broker /path/to/output /path/to/broker-at-v1.8.2
+```
+
+The script writes the newer responses to `head/` under the output folder, and the v1.8.2 responses to `v182/`. Each folder also holds a `MANIFEST.tsv` that lists the route and the status code behind every file. We copy a wanted file into this folder, and we add the `v182_` prefix to the ones from `v182/`.
+
+A fresh run differs from the committed files in a few values. The broker stamps timestamps from the clock, and the batch list orders jobs by those times, so `status*.json`, `orphans*.json`, and `batch_list.json` change from run to run. The files named `route_*` in the output are probes of routes the tests do not use, and we leave them out.
 
 ## What the fixtures leave out
 
@@ -57,6 +69,14 @@ The file `params.json` and its twin `params.yml` are inputs that we hand to Boss
 - `credentials*.json`, `manifest*.json`, and `logs*.json`
 
   The credentials, the manifest, and the broker log. The file `credentials_placeholder.json` is what the broker sends when it holds no stored credentials, and it carries a host, a user, and a password that are not real.
+
+- `task_detail*.json`
+
+  The detail of one BOSH task from `/b/tasks/{id}`, with the task, its events, and for a failed task the `error` field. There is one file each for a queued, a processing, a finished, a failed, and an unknown task.
+
+- `osb_last_operation*.json`
+
+  The answers to the last operation poll for an instance that is in progress, succeeded, failed, or gone.
 
 - `*.txt`
 

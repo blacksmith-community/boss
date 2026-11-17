@@ -18,6 +18,11 @@
           "id": "redis-large",
           "name": "large",
           "description": "fixture large plan"
+        },
+        {
+          "id": "redis-plan",
+          "name": "standalone",
+          "description": "fixture standalone plan"
         }
       ]
     }
