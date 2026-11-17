@@ -177,6 +177,14 @@ func commands() {
 	fmt.Printf("  @G{redeploy}  Recreate the VMs of an instance, or restart its jobs.\n")
 	fmt.Printf("  @G{task}      Show the BOSH deployment task for an instance.\n")
 	fmt.Printf("\n")
+	fmt.Printf("  @G{tasks}         List, read, and cancel BOSH tasks.\n")
+	fmt.Printf("  @G{batch}         List, show, pause, resume, and cancel batch jobs.\n")
+	fmt.Printf("  @G{certificates}  Read the certificate inventory, scan, and preview a rotation.\n")
+	fmt.Printf("  @G{deployment}    Restart, recreate, stop, and start a deployment, and run errands.\n")
+	fmt.Printf("  @G{resurrection}  Turn BOSH resurrection on or off for an instance.\n")
+	fmt.Printf("  @G{monitor}       Show the VM monitor summary.\n")
+	fmt.Printf("  @G{orphans}       List orphaned instances and unclaimed deployments.\n")
+	fmt.Printf("\n")
 }
 
 func options() {
