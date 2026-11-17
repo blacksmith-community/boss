@@ -365,6 +365,12 @@ func (c Client) rawRequest(method, path string, in interface{}) (int, []byte, er
 		return res.StatusCode, b, nil
 	}
 
+	// Brokers before the lifecycle routes answer an unknown route with a
+	// plain-text 404, which no instance lookup ever produces.
+	if res.StatusCode == 404 && isRouteMissing(b) {
+		return res.StatusCode, b, BrokerTooOldError{Method: method, Path: path}
+	}
+
 	// Check for error response
 	if res.StatusCode >= 400 {
 		var apiErr APIError
@@ -406,4 +412,50 @@ func (c Client) request(method, path string, in, out interface{}) (int, error) {
 	}
 
 	return status, nil
+}
+
+// isRouteMissing reports whether a 404 body is the router's own answer for
+// a route the broker does not have.
+func isRouteMissing(body []byte) bool {
+	switch strings.TrimSpace(string(body)) {
+	case "endpoint not found", "upgrade endpoint not found":
+		return true
+	}
+	return false
+}
+
+// BrokerTooOldError means the broker has no route for a command.
+type BrokerTooOldError struct {
+	Method string
+	Path   string
+}
+
+// routeCommands maps the start of a route to the command that needs it.
+var routeCommands = []struct{ prefix, command string }{
+	{"/b/tasks", "boss tasks"},
+	{"/b/upgrade", "boss batch"},
+	{"/b/certificates", "boss certificates"},
+	{"/b/deployments", "boss deployment"},
+	{"/b/orphans", "boss orphans"},
+	{"/b/bosh/vm-monitor", "boss monitor"},
+}
+
+func (e BrokerTooOldError) Error() string {
+	path := e.Path
+	if i := strings.IndexByte(path, '?'); i >= 0 {
+		path = path[:i]
+	}
+
+	command := "this command"
+	for _, rc := range routeCommands {
+		if strings.HasPrefix(path, rc.prefix) {
+			command = "`" + rc.command + "`"
+			break
+		}
+	}
+	if command == "this command" && (strings.HasSuffix(path, "/recreate") || strings.HasSuffix(path, "/restart")) {
+		command = "`boss redeploy`"
+	}
+
+	return fmt.Sprintf("this broker is too old for %s, because it has no %s %s route; upgrade the broker to use it", command, e.Method, path)
 }
