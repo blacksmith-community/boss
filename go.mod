@@ -1,6 +1,6 @@
 module github.com/blacksmith-community/boss
 
-go 1.25.0
+go 1.27.4
 
 require (
 	github.com/jhunt/go-ansi v0.0.0-20181127194324-5fd839f108b6
