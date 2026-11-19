@@ -12,8 +12,8 @@ require (
 
 require (
 	github.com/jhunt/go-snapshot v0.0.0-20171017043618-9ad8f5ee37a2 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.20.0 // indirect
-	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
+	golang.org/x/sys v0.50.0 // indirect
 )
